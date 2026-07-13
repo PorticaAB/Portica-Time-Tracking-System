@@ -123,8 +123,12 @@ export default function CalendarPage() {
     else setAnchor((a) => a.plus({ months: amount }));
   }
 
-  const days =
-    viewMode === "day" ? [range.start] : viewMode === "week" ? Array.from({ length: 7 }, (_, i) => range.start.plus({ days: i })) : [];
+  // Stable reference across re-renders (e.g. entries refetching) so
+  // TimeGrid's memoized day-grouping doesn't recompute for no reason.
+  const days = useMemo(
+    () => (viewMode === "day" ? [range.start] : viewMode === "week" ? Array.from({ length: 7 }, (_, i) => range.start.plus({ days: i })) : []),
+    [viewMode, range]
+  );
 
   return (
     <div className="flex h-full flex-col">

@@ -44,6 +44,14 @@ export function durationHours(start: DateTime, end: DateTime): number {
   return end.diff(start, "hours").hours;
 }
 
+export function formatDurationHMS(seconds: number): string {
+  const total = Math.max(Math.floor(seconds), 0);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return [h, m, s].map((n) => n.toString().padStart(2, "0")).join(":");
+}
+
 // Given a Stockholm-local calendar day, returns the [startUTC, endUTC) instant
 // interval covering that day - handles DST transitions correctly since Luxon
 // resolves local wall-clock times to the right UTC instant for that date.

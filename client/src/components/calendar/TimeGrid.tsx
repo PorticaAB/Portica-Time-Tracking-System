@@ -1,7 +1,6 @@
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { DateTime } from "luxon";
-import { SWEDEN_ZONE } from "../../lib/time";
-import { colorForProject } from "../../lib/projectColor";
+import { SWEDEN_ZONE, nowInStockholm } from "../../lib/time";
 import {
   DAY_HEIGHT,
   HOUR_HEIGHT,
@@ -11,13 +10,17 @@ import {
   yToMinutes,
 } from "./gridMath";
 import EntryPopover, { type EntryPatch } from "./EntryPopover";
+import TimeEntryBlock from "./TimeEntryBlock";
+import NowIndicator from "./NowIndicator";
 import type { Project, TimeEntry } from "../../types";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const CLICK_THRESHOLD_PX = 5;
 
+export type BlockDragType = "move" | "resize-top" | "resize-bottom";
+
 interface DragState {
-  type: "move" | "resize-top" | "resize-bottom" | "create";
+  type: BlockDragType | "create";
   dayIndex: number;
   entryId?: string;
   pointerId: number;
@@ -40,21 +43,37 @@ interface TimeGridProps {
   onDelete: (id: string) => void;
 }
 
+// Perf note: dragging/resizing updates `drag` state on every pointermove,
+// which re-renders TimeGrid itself very frequently. Two things keep that
+// cheap and keep it from cascading into a full-grid re-render:
+//  1. Entries are grouped by day once per `entries`/`days` change (useMemo),
+//     not refiltered on every drag tick.
+//  2. Each block is its own memo()'d component (TimeEntryBlock) that only
+//     re-renders when ITS OWN props change - so during a drag, unrelated
+//     blocks are skipped entirely. The live-ticking duration on a running
+//     entry works the same way: it's a self-contained interval inside that
+//     one block, isolated from this component and from every other block.
 export default function TimeGrid({ days, entries, holidaySet, projects, editable, onCreate, onUpdate, onDelete }: TimeGridProps) {
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
   const dragRef = useRef<DragState | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [openEntry, setOpenEntry] = useState<{ entry: TimeEntry; x: number; y: number } | null>(null);
 
+  const now = nowInStockholm();
+
+  const entriesByDay = useMemo(() => {
+    const map = new Map<string, TimeEntry[]>();
+    for (const day of days) map.set(day.toISODate()!, []);
+    for (const entry of entries) {
+      const key = DateTime.fromISO(entry.startTime).setZone(SWEDEN_ZONE).toISODate()!;
+      map.get(key)?.push(entry);
+    }
+    return map;
+  }, [days, entries]);
+
   function applyDrag(next: DragState | null) {
     dragRef.current = next;
     setDrag(next);
-  }
-
-  const now = DateTime.now().setZone(SWEDEN_ZONE);
-
-  function entriesForDay(day: DateTime) {
-    return entries.filter((e) => DateTime.fromISO(e.startTime).setZone(SWEDEN_ZONE).hasSame(day, "day"));
   }
 
   function startDrag(next: DragState) {
@@ -149,32 +168,33 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
     });
   }
 
-  function handleBlockPointerDown(
-    dayIndex: number,
-    entry: TimeEntry,
-    type: "move" | "resize-top" | "resize-bottom",
-    e: React.PointerEvent<HTMLDivElement>
-  ) {
-    e.stopPropagation();
-    const start = DateTime.fromISO(entry.startTime).setZone(SWEDEN_ZONE);
-    const end = entry.endTime ? DateTime.fromISO(entry.endTime).setZone(SWEDEN_ZONE) : DateTime.now().setZone(SWEDEN_ZONE);
-    if (!editable) {
-      setOpenEntry({ entry, x: e.clientX + 8, y: e.clientY });
-      return;
-    }
-    startDrag({
-      type,
-      dayIndex,
-      entryId: entry.id,
-      pointerId: e.pointerId,
-      originClientY: e.clientY,
-      originStartMin: minutesSinceMidnight(start),
-      originEndMin: minutesSinceMidnight(end),
-      currentStartMin: minutesSinceMidnight(start),
-      currentEndMin: minutesSinceMidnight(end),
-      moved: false,
-    });
-  }
+  // Stable across renders (deps limited to `editable`) so TimeEntryBlock's
+  // memo() can actually skip unrelated blocks - see the perf note above.
+  const handleBlockPointerDown = useCallback(
+    (dayIndex: number, entry: TimeEntry, type: BlockDragType, e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      const start = DateTime.fromISO(entry.startTime).setZone(SWEDEN_ZONE);
+      const end = entry.endTime ? DateTime.fromISO(entry.endTime).setZone(SWEDEN_ZONE) : DateTime.now().setZone(SWEDEN_ZONE);
+      if (!editable) {
+        setOpenEntry({ entry, x: e.clientX + 8, y: e.clientY });
+        return;
+      }
+      startDrag({
+        type,
+        dayIndex,
+        entryId: entry.id,
+        pointerId: e.pointerId,
+        originClientY: e.clientY,
+        originStartMin: minutesSinceMidnight(start),
+        originEndMin: minutesSinceMidnight(end),
+        currentStartMin: minutesSinceMidnight(start),
+        currentEndMin: minutesSinceMidnight(end),
+        moved: false,
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editable]
+  );
 
   return (
     <div className="flex h-full overflow-auto bg-canvas">
@@ -188,7 +208,7 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
       </div>
 
       {days.map((day, dayIndex) => {
-        const dayEntries = entriesForDay(day);
+        const dayEntries = entriesByDay.get(day.toISODate()!) ?? [];
         const holidayName = holidaySet.get(day.toFormat("yyyy-MM-dd"));
         const isHoliday = !!holidayName;
         const isToday = day.hasSame(now, "day");
@@ -217,52 +237,18 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
                 <div key={h} className="pointer-events-none border-b border-line-soft" style={{ height: HOUR_HEIGHT }} />
               ))}
 
-              {isToday && (
-                <div
-                  className="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
-                  style={{ top: minutesToY(minutesSinceMidnight(now)) }}
-                >
-                  <span className="-ml-1 h-2 w-2 rounded-full bg-danger-500" />
-                  <span className="h-px flex-1 bg-danger-500" />
-                </div>
-              )}
+              <NowIndicator day={day} />
 
-              {dayEntries.map((entry) => {
-                if (drag?.type !== undefined && drag.entryId === entry.id) return null;
-                const start = DateTime.fromISO(entry.startTime).setZone(SWEDEN_ZONE);
-                const end = entry.endTime ? DateTime.fromISO(entry.endTime).setZone(SWEDEN_ZONE) : now;
-                const top = minutesToY(minutesSinceMidnight(start));
-                const height = Math.max(minutesToY(minutesSinceMidnight(end)) - top, 16);
-                const color = colorForProject(entry.projectId);
-                const isRunning = !entry.endTime;
-
-                return (
-                  <div
-                    key={entry.id}
-                    onPointerDown={(e) => handleBlockPointerDown(dayIndex, entry, "move", e)}
-                    style={{ top, height, backgroundColor: `${color}1F`, borderColor: color }}
-                    className="group absolute left-1 right-1 z-20 cursor-grab overflow-hidden rounded-lg border-l-[3px] px-2 py-1 text-xs shadow-soft transition-all duration-150 hover:-translate-y-0.5 hover:shadow-soft-md active:cursor-grabbing active:shadow-soft-lg"
-                  >
-                    {editable && (
-                      <div
-                        onPointerDown={(e) => handleBlockPointerDown(dayIndex, entry, "resize-top", e)}
-                        className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
-                      />
-                    )}
-                    <p className="truncate font-medium" style={{ color }}>
-                      {entry.project.name}
-                      {isRunning && " · running"}
-                    </p>
-                    <p className="truncate text-ink-muted">{entry.description || entry.task?.name || ""}</p>
-                    {editable && (
-                      <div
-                        onPointerDown={(e) => handleBlockPointerDown(dayIndex, entry, "resize-bottom", e)}
-                        className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
-                      />
-                    )}
-                  </div>
-                );
-              })}
+              {dayEntries.map((entry) => (
+                <TimeEntryBlock
+                  key={entry.id}
+                  entry={entry}
+                  dayIndex={dayIndex}
+                  editable={editable}
+                  hidden={drag?.entryId === entry.id}
+                  onPointerDown={handleBlockPointerDown}
+                />
+              ))}
 
               {draggingHere && drag.type === "create" && (
                 <div
