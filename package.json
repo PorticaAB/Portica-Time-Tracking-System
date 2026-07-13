@@ -1,5 +1,5 @@
 {
-  "name": "portica-time-tracking-system",
+  "name": "klocka",
   "private": true,
   "version": "1.0.0",
   "workspaces": [
@@ -7,12 +7,12 @@
     "server"
   ],
   "scripts": {
-    "dev:server": "npm run dev --workspace server",
-    "dev:client": "npm run dev --workspace client",
-    "build:server": "npm run build --workspace server",
-    "build:client": "npm run build --workspace client",
-    "prisma:generate": "npm run prisma:generate --workspace server",
-    "prisma:migrate": "npm run prisma:migrate --workspace server",
-    "seed": "npm run seed --workspace server"
+    "dev:server": "npm run dev --workspace klocka-server",
+    "dev:client": "npm run dev --workspace klocka-client",
+    "build:server": "npm run build --workspace klocka-server",
+    "build:client": "npm run build --workspace klocka-client",
+    "prisma:generate": "npm run prisma:generate --workspace klocka-server",
+    "prisma:migrate": "npm run prisma:migrate --workspace klocka-server",
+    "seed": "npm run seed --workspace klocka-server"
   }
 }

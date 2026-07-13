@@ -32,7 +32,7 @@ interface DragState {
 interface TimeGridProps {
   days: DateTime[];
   entries: TimeEntry[];
-  holidaySet: Set<string>;
+  holidaySet: Map<string, string>;
   projects: Project[];
   editable: boolean;
   onCreate: (start: DateTime, end: DateTime) => void;
@@ -177,11 +177,11 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
   }
 
   return (
-    <div className="flex h-full overflow-auto">
-      <div className="sticky left-0 z-10 w-14 flex-none bg-white">
-        <div className="h-10 border-b border-slate-200" />
+    <div className="flex h-full overflow-auto bg-canvas">
+      <div className="sticky left-0 z-10 w-14 flex-none bg-canvas">
+        <div className="h-11 border-b border-line" />
         {HOURS.map((h) => (
-          <div key={h} style={{ height: HOUR_HEIGHT }} className="relative -top-2.5 pr-2 text-right text-xs text-slate-400">
+          <div key={h} style={{ height: HOUR_HEIGHT }} className="relative -top-2.5 pr-2 text-right text-xs text-ink-faint">
             {h.toString().padStart(2, "0")}:00
           </div>
         ))}
@@ -189,35 +189,42 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
 
       {days.map((day, dayIndex) => {
         const dayEntries = entriesForDay(day);
-        const isHoliday = holidaySet.has(day.toFormat("yyyy-MM-dd"));
+        const holidayName = holidaySet.get(day.toFormat("yyyy-MM-dd"));
+        const isHoliday = !!holidayName;
         const isToday = day.hasSame(now, "day");
+        const isWeekend = day.weekday === 6 || day.weekday === 7;
         const draggingHere = drag && drag.dayIndex === dayIndex;
 
         return (
-          <div key={day.toISO()} className="relative flex-1 border-l border-slate-200" style={{ minWidth: days.length > 1 ? 120 : undefined }}>
+          <div key={day.toISO()} className="relative flex-1 border-l border-line" style={{ minWidth: days.length > 1 ? 120 : undefined }}>
             <div
-              className={`sticky top-0 z-10 h-10 border-b border-slate-200 px-2 py-1.5 text-center text-sm font-medium ${
-                isHoliday ? "bg-amber-50 text-amber-700" : isToday ? "bg-brand-50 text-brand-700" : "bg-white text-slate-600"
+              title={holidayName}
+              className={`sticky top-0 z-10 flex h-11 items-center justify-center gap-1.5 border-b border-line px-2 text-sm font-medium ${
+                isToday ? "bg-accent-50 text-accent-700" : isHoliday ? "bg-accent-50/50 text-accent-700" : "bg-surface text-ink-muted"
               }`}
             >
+              {isToday && <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />}
               {day.toFormat("ccc d LLL")}
-              {isHoliday && <span className="ml-1 text-xs">🎌</span>}
+              {isHoliday && !isToday && <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />}
             </div>
             <div
               ref={(el) => (columnRefs.current[dayIndex] = el)}
               onPointerDown={(e) => handleColumnPointerDown(dayIndex, e)}
-              className={`relative ${isHoliday ? "bg-amber-50/40" : ""}`}
+              className={`relative ${isToday ? "bg-accent-50/40" : isHoliday ? "bg-accent-50/20" : isWeekend ? "bg-line-soft/50" : "bg-surface"}`}
               style={{ height: DAY_HEIGHT }}
             >
               {HOURS.map((h) => (
-                <div key={h} className="pointer-events-none border-b border-slate-100" style={{ height: HOUR_HEIGHT }} />
+                <div key={h} className="pointer-events-none border-b border-line-soft" style={{ height: HOUR_HEIGHT }} />
               ))}
 
               {isToday && (
                 <div
-                  className="pointer-events-none absolute left-0 right-0 z-10 border-t-2 border-red-500"
+                  className="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
                   style={{ top: minutesToY(minutesSinceMidnight(now)) }}
-                />
+                >
+                  <span className="-ml-1 h-2 w-2 rounded-full bg-danger-500" />
+                  <span className="h-px flex-1 bg-danger-500" />
+                </div>
               )}
 
               {dayEntries.map((entry) => {
@@ -233,8 +240,8 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
                   <div
                     key={entry.id}
                     onPointerDown={(e) => handleBlockPointerDown(dayIndex, entry, "move", e)}
-                    style={{ top, height, backgroundColor: `${color}22`, borderColor: color }}
-                    className="absolute left-1 right-1 z-20 cursor-grab overflow-hidden rounded-md border-l-4 px-2 py-1 text-xs shadow-sm"
+                    style={{ top, height, backgroundColor: `${color}1F`, borderColor: color }}
+                    className="group absolute left-1 right-1 z-20 cursor-grab overflow-hidden rounded-lg border-l-[3px] px-2 py-1 text-xs shadow-soft transition-all duration-150 hover:-translate-y-0.5 hover:shadow-soft-md active:cursor-grabbing active:shadow-soft-lg"
                   >
                     {editable && (
                       <div
@@ -246,7 +253,7 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
                       {entry.project.name}
                       {isRunning && " · running"}
                     </p>
-                    <p className="truncate text-slate-600">{entry.description || entry.task?.name || ""}</p>
+                    <p className="truncate text-ink-muted">{entry.description || entry.task?.name || ""}</p>
                     {editable && (
                       <div
                         onPointerDown={(e) => handleBlockPointerDown(dayIndex, entry, "resize-bottom", e)}
@@ -260,7 +267,7 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
               {draggingHere && drag.type === "create" && (
                 <div
                   style={{ top: minutesToY(drag.currentStartMin), height: minutesToY(drag.currentEndMin - drag.currentStartMin) }}
-                  className="pointer-events-none absolute left-1 right-1 z-30 rounded-md border-l-4 border-brand-500 bg-brand-100/70 px-2 py-1 text-xs"
+                  className="pointer-events-none absolute left-1 right-1 z-30 rounded-lg border-l-[3px] border-brand-500 bg-brand-100/70 px-2 py-1 text-xs font-medium text-brand-700 shadow-soft-md"
                 >
                   {formatClock(drag.currentStartMin)} – {formatClock(drag.currentEndMin)}
                 </div>
@@ -269,7 +276,7 @@ export default function TimeGrid({ days, entries, holidaySet, projects, editable
               {draggingHere && drag.entryId && (drag.type === "move" || drag.type === "resize-top" || drag.type === "resize-bottom") && (
                 <div
                   style={{ top: minutesToY(drag.currentStartMin), height: Math.max(minutesToY(drag.currentEndMin - drag.currentStartMin), 16) }}
-                  className="pointer-events-none absolute left-1 right-1 z-30 rounded-md border-l-4 border-brand-500 bg-brand-100/80 px-2 py-1 text-xs"
+                  className="pointer-events-none absolute left-1 right-1 z-30 rounded-lg border-l-[3px] border-brand-500 bg-brand-100/80 px-2 py-1 text-xs font-medium text-brand-700 shadow-soft-lg"
                 >
                   {formatClock(drag.currentStartMin)} – {formatClock(drag.currentEndMin)}
                 </div>

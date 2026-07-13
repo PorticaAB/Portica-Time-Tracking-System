@@ -83,7 +83,7 @@ export default function CalendarPage() {
     });
   }, [range]);
 
-  const holidaySet = useMemo(() => new Set(holidays.map((h) => h.date.slice(0, 10))), [holidays]);
+  const holidaySet = useMemo(() => new Map(holidays.map((h) => [h.date.slice(0, 10), h.name])), [holidays]);
 
   async function handleUpdate(id: string, patch: EntryPatch) {
     try {
@@ -130,18 +130,18 @@ export default function CalendarPage() {
     <div className="flex h-full flex-col">
       {!isAdmin && <TimerBar projects={projects} onEntryChanged={loadEntries} />}
 
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-2">
+      <div className="flex items-center justify-between border-b border-line bg-surface px-6 py-2.5">
         <div className="flex items-center gap-2">
-          <button onClick={() => shift(-1)} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
+          <button onClick={() => shift(-1)} className="rounded-lg px-2 py-1 text-ink-muted transition-colors duration-150 hover:bg-line-soft hover:text-ink">
             ‹
           </button>
-          <button onClick={goToday} className="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50">
+          <button onClick={goToday} className="rounded-lg border border-line px-3 py-1 text-sm text-ink-muted transition-colors duration-150 hover:bg-line-soft hover:text-ink">
             Today
           </button>
-          <button onClick={() => shift(1)} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
+          <button onClick={() => shift(1)} className="rounded-lg px-2 py-1 text-ink-muted transition-colors duration-150 hover:bg-line-soft hover:text-ink">
             ›
           </button>
-          <span className="ml-2 text-sm font-medium text-slate-700">
+          <span className="ml-2 font-display text-base font-medium text-ink">
             {viewMode === "month" ? anchor.toFormat("LLLL yyyy") : `${range.start.toFormat("d LLL")} – ${range.end.minus({ days: 1 }).toFormat("d LLL yyyy")}`}
           </span>
         </div>
@@ -151,7 +151,7 @@ export default function CalendarPage() {
             <select
               value={selectedContractorId}
               onChange={(e) => setSelectedContractorId(e.target.value)}
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             >
               {contractors.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -160,14 +160,14 @@ export default function CalendarPage() {
               ))}
             </select>
           )}
-          <div className="flex rounded-md border border-slate-200 p-0.5">
+          <div className="flex rounded-lg border border-line bg-line-soft/50 p-0.5">
             {(["day", "week", "month"] as ViewMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={clsx(
-                  "rounded px-3 py-1 text-sm capitalize",
-                  viewMode === mode ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100"
+                  "rounded-md px-3 py-1 text-sm capitalize transition-all duration-150",
+                  viewMode === mode ? "bg-surface text-brand-700 shadow-soft" : "text-ink-muted hover:text-ink"
                 )}
               >
                 {mode}
@@ -177,7 +177,7 @@ export default function CalendarPage() {
           {editable && (
             <button
               onClick={() => setCreateRange({ start: nowInStockholm().set({ minute: 0, second: 0 }), end: nowInStockholm().set({ minute: 0, second: 0 }).plus({ hours: 1 }) })}
-              className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98]"
             >
               + Add entry
             </button>
@@ -185,7 +185,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {error && <p className="bg-red-50 px-6 py-1 text-sm text-red-600">{error}</p>}
+      {error && <p className="bg-danger-50 px-6 py-1 text-sm text-danger-600">{error}</p>}
 
       <div className="flex-1 overflow-hidden">
         {viewMode === "month" ? (

@@ -1,7 +1,8 @@
-# Portica Time Tracking System
+# Klocka
 
-A Toggl-style time tracking tool for Portica AB's independent contractors. Log hours against
-clients/projects on a drag-and-drop calendar, track Swedish public holidays, and export reports.
+Klocka by Catarina Bertling — a Toggl-style time tracking tool for Portica AB's independent
+contractors. Log hours against clients/projects on a drag-and-drop calendar, track Swedish public
+holidays, and export reports.
 
 ## Stack
 

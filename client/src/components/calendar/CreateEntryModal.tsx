@@ -56,20 +56,23 @@ export default function CreateEntryModal({ day, defaultStart, defaultEnd, projec
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/20 backdrop-blur-[2px]" onClick={onClose}>
       <form
         onSubmit={handleSubmit(onSubmit)}
         onClick={(e) => e.stopPropagation()}
-        className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-xl"
+        className="w-80 rounded-xl border border-line bg-surface p-5 shadow-soft-lg"
       >
-        <h3 className="mb-1 text-sm font-semibold text-slate-800">New time entry</h3>
-        <p className="mb-3 text-xs text-slate-500">{day.toFormat("ccc d LLL yyyy")}</p>
+        <h3 className="mb-1 font-display text-base font-semibold text-ink">New time entry</h3>
+        <p className="mb-3 text-xs text-ink-muted">{day.toFormat("ccc d LLL yyyy")}</p>
 
         {projects.length === 0 ? (
-          <p className="mb-3 text-sm text-red-600">You have no assigned projects yet. Ask your admin to assign one.</p>
+          <p className="mb-3 text-sm text-danger-600">You have no assigned projects yet. Ask your admin to assign one.</p>
         ) : (
           <>
-            <select {...register("projectId", { required: true })} className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <select
+              {...register("projectId", { required: true })}
+              className="mb-2 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            >
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.client.name} · {p.name}
@@ -78,7 +81,10 @@ export default function CreateEntryModal({ day, defaultStart, defaultEnd, projec
             </select>
 
             {project && project.tasks.length > 0 && (
-              <select {...register("taskId")} className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+              <select
+                {...register("taskId")}
+                className="mb-2 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              >
                 <option value="">No task</option>
                 {project.tasks.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -92,26 +98,38 @@ export default function CreateEntryModal({ day, defaultStart, defaultEnd, projec
               {...register("description")}
               placeholder="Description"
               rows={2}
-              className="mb-2 w-full resize-none rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              className="mb-2 w-full resize-none rounded-lg border border-line bg-canvas/40 px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
 
             <div className="mb-3 flex items-center gap-2">
-              <input type="time" {...register("startTime", { required: true })} className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
-              <span className="text-slate-400">–</span>
-              <input type="time" {...register("endTime", { required: true })} className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+              <input
+                type="time"
+                {...register("startTime", { required: true })}
+                className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+              <span className="text-ink-faint">–</span>
+              <input
+                type="time"
+                {...register("endTime", { required: true })}
+                className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
             </div>
-            {(errors.startTime || errors.endTime) && <p className="mb-2 text-xs text-red-600">Start and end time are required.</p>}
+            {(errors.startTime || errors.endTime) && <p className="mb-2 text-xs text-danger-600">Start and end time are required.</p>}
           </>
         )}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted transition-all duration-150 hover:bg-line-soft active:scale-[0.98]"
+          >
             Cancel
           </button>
           <button
             type="submit"
             disabled={projects.length === 0}
-            className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98] disabled:opacity-50"
           >
             Create
           </button>

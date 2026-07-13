@@ -87,7 +87,7 @@ export default function TimerBar({ projects, onEntryChanged }: TimerBarProps) {
   }
 
   return (
-    <div className="border-b border-slate-200 bg-white px-6 py-3">
+    <div className="border-b border-line bg-surface px-6 py-3.5">
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
@@ -95,7 +95,7 @@ export default function TimerBar({ projects, onEntryChanged }: TimerBarProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           disabled={!!running}
-          className="min-w-[220px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="min-w-[220px] flex-1 rounded-lg border border-line bg-canvas/40 px-3 py-2 text-sm text-ink transition-colors duration-150 focus:border-brand-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
         />
         <select
           value={projectId}
@@ -104,7 +104,7 @@ export default function TimerBar({ projects, onEntryChanged }: TimerBarProps) {
             setTaskId("");
           }}
           disabled={!!running}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
         >
           <option value="">Select client / project…</option>
           {projects.map((p) => (
@@ -118,7 +118,7 @@ export default function TimerBar({ projects, onEntryChanged }: TimerBarProps) {
             value={taskId}
             onChange={(e) => setTaskId(e.target.value)}
             disabled={!!running}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
           >
             <option value="">No task</option>
             {selectedProject.tasks.map((t) => (
@@ -128,14 +128,14 @@ export default function TimerBar({ projects, onEntryChanged }: TimerBarProps) {
             ))}
           </select>
         )}
-        <div className="w-24 text-center font-mono text-lg tabular-nums text-slate-700">
+        <div className="w-28 text-center font-display text-xl tabular-nums text-ink">
           {formatElapsed(elapsed)}
         </div>
         {running ? (
           <button
             onClick={handleStop}
             disabled={busy}
-            className="rounded-md bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            className="rounded-lg bg-accent-600 px-5 py-2 text-sm font-semibold text-white shadow-soft transition-all duration-150 hover:bg-accent-700 hover:shadow-soft-md active:scale-[0.98] disabled:opacity-50"
           >
             Stop
           </button>
@@ -143,13 +143,13 @@ export default function TimerBar({ projects, onEntryChanged }: TimerBarProps) {
           <button
             onClick={handleStart}
             disabled={busy}
-            className="rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98] disabled:opacity-50"
           >
             Start
           </button>
         )}
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger-600">{error}</p>}
     </div>
   );
 }

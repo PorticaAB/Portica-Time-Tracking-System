@@ -56,12 +56,12 @@ export default function EntryPopover({ entry, projects, position, editable, onCl
   }
 
   return (
-    <div ref={ref} style={style} className="w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+    <div ref={ref} style={style} className="w-72 rounded-xl border border-line bg-surface p-4 shadow-soft-lg">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-medium uppercase text-slate-400">
+        <span className="text-xs font-medium uppercase tracking-wide text-ink-faint">
           {start.toFormat("ccc d LLL")}
         </span>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+        <button onClick={onClose} className="rounded-md p-0.5 text-ink-faint transition-colors duration-150 hover:bg-line-soft hover:text-ink">
           ✕
         </button>
       </div>
@@ -73,14 +73,14 @@ export default function EntryPopover({ entry, projects, position, editable, onCl
         disabled={!editable}
         placeholder="Description"
         rows={2}
-        className="mb-2 w-full resize-none rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50"
+        className="mb-2 w-full resize-none rounded-lg border border-line bg-canvas/40 px-2 py-1.5 text-sm text-ink transition-colors duration-150 focus:border-brand-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
       />
 
       <select
         value={entry.projectId}
         onChange={(e) => onSave({ projectId: e.target.value, taskId: null })}
         disabled={!editable}
-        className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50"
+        className="mb-2 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
       >
         {projects.map((p) => (
           <option key={p.id} value={p.id}>
@@ -94,7 +94,7 @@ export default function EntryPopover({ entry, projects, position, editable, onCl
           value={entry.taskId ?? ""}
           onChange={(e) => onSave({ taskId: e.target.value || null })}
           disabled={!editable}
-          className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50"
+          className="mb-2 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
         >
           <option value="">No task</option>
           {project.tasks.map((t) => (
@@ -111,22 +111,22 @@ export default function EntryPopover({ entry, projects, position, editable, onCl
           defaultValue={start.toFormat("HH:mm")}
           onChange={(e) => handleTimeChange("start", e.target.value)}
           disabled={!editable}
-          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50"
+          className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
         />
-        <span className="text-slate-400">–</span>
+        <span className="text-ink-faint">–</span>
         <input
           type="time"
           defaultValue={entry.endTime ? end.toFormat("HH:mm") : ""}
           onChange={(e) => handleTimeChange("end", e.target.value)}
           disabled={!editable || !entry.endTime}
-          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50"
+          className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-line-soft/60"
         />
       </div>
 
       {editable && (
         <button
           onClick={onDelete}
-          className="w-full rounded-md border border-red-200 px-2 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+          className="w-full rounded-lg border border-danger-200 px-2 py-1.5 text-sm font-medium text-danger-600 transition-all duration-150 hover:bg-danger-50 active:scale-[0.98]"
         >
           Delete entry
         </button>

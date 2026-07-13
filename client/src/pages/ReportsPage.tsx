@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { useAuth } from "../contexts/AuthContext";
 import { api, getErrorMessage } from "../lib/api";
 import { nowInStockholm } from "../lib/time";
+import { colorForProject } from "../lib/projectColor";
 import type { ClientRecord, Project, ReportSummary, User } from "../types";
 
 export default function ReportsPage() {
@@ -64,22 +65,32 @@ export default function ReportsPage() {
     }
   }
 
-  const chartData = (summary?.byProject ?? []).map((p) => ({ name: p.projectName, hours: Math.round(p.hours * 100) / 100 }));
+  const chartData = (summary?.byProject ?? []).map((p) => ({
+    name: p.projectName,
+    hours: Math.round(p.hours * 100) / 100,
+    color: colorForProject(p.projectId),
+  }));
+
+  const fieldClass =
+    "rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
   return (
-    <div className="h-full overflow-y-auto p-8">
+    <div className="h-full overflow-y-auto bg-canvas p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900">Reports</h1>
-        <button onClick={handleExport} className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Reports</h1>
+        <button
+          onClick={handleExport}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98]"
+        >
           Export CSV
         </button>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4 shadow-soft">
         {isAdmin && (
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Contractor</label>
-            <select value={userId} onChange={(e) => setUserId(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Contractor</label>
+            <select value={userId} onChange={(e) => setUserId(e.target.value)} className={fieldClass}>
               <option value="">All contractors</option>
               {contractors.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -90,14 +101,14 @@ export default function ReportsPage() {
           </div>
         )}
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Client</label>
+          <label className="mb-1 block text-xs font-medium text-ink-muted">Client</label>
           <select
             value={clientId}
             onChange={(e) => {
               setClientId(e.target.value);
               setProjectId("");
             }}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className={fieldClass}
           >
             <option value="">All clients</option>
             {clients.map((c) => (
@@ -108,8 +119,8 @@ export default function ReportsPage() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Project</label>
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+          <label className="mb-1 block text-xs font-medium text-ink-muted">Project</label>
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={fieldClass}>
             <option value="">All projects</option>
             {filteredProjects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -119,67 +130,81 @@ export default function ReportsPage() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">From</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+          <label className="mb-1 block text-xs font-medium text-ink-muted">From</label>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldClass} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">To</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+          <label className="mb-1 block text-xs font-medium text-ink-muted">To</label>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldClass} />
         </div>
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
 
       {summary && (
         <>
           <div className="mb-6 grid grid-cols-3 gap-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-medium uppercase text-slate-400">Total hours</p>
-              <p className="text-2xl font-semibold text-slate-900">{summary.totalHours.toFixed(1)}h</p>
+            <div className="rounded-xl border border-line bg-surface p-4 shadow-soft">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">Total hours</p>
+              <p className="font-display text-3xl font-semibold text-ink">{summary.totalHours.toFixed(1)}h</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-medium uppercase text-slate-400">Entries</p>
-              <p className="text-2xl font-semibold text-slate-900">{summary.entryCount}</p>
+            <div className="rounded-xl border border-line bg-surface p-4 shadow-soft">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">Entries</p>
+              <p className="font-display text-3xl font-semibold text-ink">{summary.entryCount}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-medium uppercase text-slate-400">Projects</p>
-              <p className="text-2xl font-semibold text-slate-900">{summary.byProject.length}</p>
+            <div className="rounded-xl border border-line bg-surface p-4 shadow-soft">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">Projects</p>
+              <p className="font-display text-3xl font-semibold text-ink">{summary.byProject.length}</p>
             </div>
           </div>
 
-          <div className="mb-6 h-72 rounded-lg border border-slate-200 bg-white p-4">
-            <p className="mb-2 text-sm font-semibold text-slate-700">Hours by project</p>
+          <div className="mb-6 h-72 rounded-xl border border-line bg-surface p-4 shadow-soft">
+            <p className="mb-2 text-sm font-semibold text-ink">Hours by project</p>
             <ResponsiveContainer width="100%" height="90%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="hours" fill="#3568f5" radius={[4, 4, 0, 0]} />
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 6" stroke="#E7E2D8" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#6F6B62" }} axisLine={{ stroke: "#E7E2D8" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "#6F6B62" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  cursor={{ fill: "#EFEBE2" }}
+                  contentStyle={{
+                    borderRadius: 10,
+                    border: "1px solid #E7E2D8",
+                    boxShadow: "0 4px 8px rgba(33,31,27,0.06), 0 16px 36px rgba(33,31,27,0.11)",
+                    fontSize: 13,
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                  labelStyle={{ color: "#211F1B", fontWeight: 600 }}
+                />
+                <Bar dataKey="hours" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                  {chartData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-soft">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
+              <thead className="bg-line-soft/60 text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
                 <tr>
-                  <th className="px-4 py-2">Client</th>
-                  <th className="px-4 py-2">Project</th>
-                  <th className="px-4 py-2 text-right">Hours</th>
+                  <th className="px-4 py-2.5">Client</th>
+                  <th className="px-4 py-2.5">Project</th>
+                  <th className="px-4 py-2.5 text-right">Hours</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {summary.byProject.map((p) => (
-                  <tr key={p.projectId}>
-                    <td className="px-4 py-2 text-slate-500">{p.clientName}</td>
-                    <td className="px-4 py-2 font-medium text-slate-800">{p.projectName}</td>
-                    <td className="px-4 py-2 text-right">{p.hours.toFixed(2)}</td>
+                  <tr key={p.projectId} className="transition-colors duration-150 hover:bg-line-soft/40">
+                    <td className="px-4 py-2.5 text-ink-muted">{p.clientName}</td>
+                    <td className="px-4 py-2.5 font-medium text-ink">{p.projectName}</td>
+                    <td className="px-4 py-2.5 text-right text-ink">{p.hours.toFixed(2)}</td>
                   </tr>
                 ))}
                 {summary.byProject.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                    <td colSpan={3} className="px-4 py-6 text-center text-ink-faint">
                       No time entries in this range.
                     </td>
                   </tr>
