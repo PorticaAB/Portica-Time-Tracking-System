@@ -68,6 +68,10 @@ model Client {
   id        String    @id @default(cuid())
   name      String
   isActive  Boolean   @default(true)
+  // Marks the single system-managed "Unassigned" bucket that absorbs time
+  // entries orphaned by a permanent project/client delete. Hidden from
+  // listings and immune to further edit/delete.
+  isSystem  Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -81,6 +85,7 @@ model Project {
   name          String
   clientId      String
   isActive      Boolean  @default(true)
+  isSystem      Boolean  @default(false)
   billableRate  Decimal? @db.Decimal(10, 2)
   currency      String?  @default("SEK")
   createdAt     DateTime @default(now())

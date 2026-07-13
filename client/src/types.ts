@@ -18,6 +18,7 @@ export interface ClientRecord {
   name: string;
   isActive: boolean;
   projects?: { id: string; name: string; isActive?: boolean }[];
+  _count?: { projects: number };
 }
 
 export interface TaskAssignment {
@@ -44,6 +45,7 @@ export interface Project {
   currency: string | null;
   client: { id: string; name: string };
   tasks: ProjectTask[];
+  _count?: { timeEntries: number };
 }
 
 export interface TimeEntry {

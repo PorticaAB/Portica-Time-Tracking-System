@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { getOrCreateUnassignedProjectId } from "../lib/unassigned";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -11,12 +12,13 @@ router.use(requireAuth);
 // Clients/Projects are simple flat tags - every active team member can log
 // time against any active project. Only premade Tasks within a project can
 // be scoped to specific people (see the task assignment endpoints below).
+// The system-managed "Unassigned" bucket is always hidden from listings.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
     const isAdmin = req.user!.role === "ADMIN";
     const projects = await prisma.project.findMany({
-      where: isAdmin ? undefined : { isActive: true },
+      where: isAdmin ? { isSystem: false } : { isActive: true, isSystem: false },
       orderBy: { name: "asc" },
       include: {
         client: { select: { id: true, name: true } },
@@ -25,6 +27,7 @@ router.get(
           orderBy: { name: "asc" },
           include: { assignments: { select: { userId: true } } },
         },
+        ...(isAdmin ? { _count: { select: { timeEntries: true } } } : {}),
       },
     });
 
@@ -50,7 +53,7 @@ router.get(
         tasks: { include: { assignments: { include: { user: { select: { id: true, name: true } } } } } },
       },
     });
-    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!project || project.isSystem) return res.status(404).json({ error: "Project not found" });
     if (req.user!.role !== "ADMIN" && !project.isActive) {
       return res.status(404).json({ error: "Project not found" });
     }
@@ -95,17 +98,34 @@ const updateSchema = z.object({
 router.patch(
   "/:id",
   asyncHandler(async (req, res) => {
+    const existing = await prisma.project.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.isSystem) return res.status(404).json({ error: "Project not found" });
     const data = updateSchema.parse(req.body);
     const project = await prisma.project.update({ where: { id: req.params.id }, data });
     res.json(project);
   })
 );
 
+// Permanent, irreversible delete. Any time entries logged against this
+// project are reassigned to the "Unassigned" bucket first, so historical
+// hours in reports/calendar survive - only the project label is lost, not
+// the logged time itself.
 router.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    const project = await prisma.project.update({ where: { id: req.params.id }, data: { isActive: false } });
-    res.json(project);
+    const existing = await prisma.project.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.isSystem) return res.status(404).json({ error: "Project not found" });
+
+    await prisma.$transaction(async (tx) => {
+      const unassignedProjectId = await getOrCreateUnassignedProjectId(tx);
+      await tx.timeEntry.updateMany({
+        where: { projectId: req.params.id },
+        data: { projectId: unassignedProjectId, taskId: null },
+      });
+      await tx.project.delete({ where: { id: req.params.id } });
+    });
+
+    res.status(204).end();
   })
 );
 

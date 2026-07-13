@@ -3,6 +3,11 @@ import { useForm } from "react-hook-form";
 import { api, getErrorMessage } from "../../lib/api";
 import type { ClientRecord, Project, User } from "../../types";
 import clsx from "../../lib/clsx";
+import ConfirmDeleteDialog from "../../components/ConfirmDeleteDialog";
+
+function entryCountText(count: number): string {
+  return count === 1 ? "1 time entry" : `${count} time entries`;
+}
 
 interface ClientForm {
   name: string;
@@ -28,6 +33,10 @@ export default function ProjectsPage() {
   const [clientFilter, setClientFilter] = useState<string>("");
   const [expandedProjectId, setExpandedProjectId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: "client"; client: ClientRecord } | { kind: "project"; project: Project } | null
+  >(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const clientForm = useForm<ClientForm>();
   const projectForm = useForm<ProjectForm>();
@@ -89,6 +98,25 @@ export default function ProjectsPage() {
     loadAll();
   }
 
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setError(null);
+    setDeleteBusy(true);
+    try {
+      if (deleteTarget.kind === "client") {
+        await api.delete(`/clients/${deleteTarget.client.id}`);
+      } else {
+        await api.delete(`/projects/${deleteTarget.project.id}`);
+      }
+      setDeleteTarget(null);
+      loadAll();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   async function updateBillableRate(project: Project, value: string) {
     await api.patch(`/projects/${project.id}`, { billableRate: value ? Number(value) : null });
     loadAll();
@@ -145,6 +173,13 @@ export default function ProjectsPage() {
               {c.name}
               <button onClick={() => toggleClientActive(c)} className="text-ink-faint hover:text-ink" title={c.isActive ? "Archive" : "Restore"}>
                 {c.isActive ? "✕" : "↺"}
+              </button>
+              <button
+                onClick={() => setDeleteTarget({ kind: "client", client: c })}
+                className="text-xs font-medium text-danger-500 hover:text-danger-700"
+                title="Delete permanently"
+              >
+                Delete
               </button>
             </span>
           ))}
@@ -225,12 +260,20 @@ export default function ProjectsPage() {
                         onBlur={(e) => updateBillableRate(project, e.target.value)}
                         className={clsx(fieldClass, "w-28")}
                       />
-                      <button
-                        onClick={() => toggleProjectActive(project)}
-                        className="ml-auto text-sm text-ink-muted transition-colors duration-150 hover:text-ink"
-                      >
-                        {project.isActive ? "Archive project" : "Restore project"}
-                      </button>
+                      <div className="ml-auto flex items-center gap-3">
+                        <button
+                          onClick={() => toggleProjectActive(project)}
+                          className="text-sm text-ink-muted transition-colors duration-150 hover:text-ink"
+                        >
+                          {project.isActive ? "Archive project" : "Restore project"}
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget({ kind: "project", project })}
+                          className="rounded-lg border border-danger-200 px-2 py-1 text-sm font-medium text-danger-600 transition-all duration-150 hover:bg-danger-50 active:scale-[0.98]"
+                        >
+                          Delete project
+                        </button>
+                      </div>
                     </div>
 
                     <p className="mb-2 text-sm font-semibold text-ink">Tasks</p>
@@ -285,6 +328,34 @@ export default function ProjectsPage() {
           {visibleProjects.length === 0 && <p className="text-sm text-ink-faint">No projects yet.</p>}
         </div>
       </div>
+
+      {deleteTarget?.kind === "client" && (
+        <ConfirmDeleteDialog
+          title={`Delete "${deleteTarget.client.name}"?`}
+          description={
+            deleteTarget.client._count?.projects
+              ? `This permanently deletes "${deleteTarget.client.name}" and its ${deleteTarget.client._count.projects} project(s). Any time entries logged against them will be moved to an "Unassigned" bucket so historical reports stay accurate. This cannot be undone.`
+              : `This permanently deletes "${deleteTarget.client.name}". This cannot be undone.`
+          }
+          busy={deleteBusy}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {deleteTarget?.kind === "project" && (
+        <ConfirmDeleteDialog
+          title={`Delete "${deleteTarget.project.name}"?`}
+          description={
+            deleteTarget.project._count?.timeEntries
+              ? `This permanently deletes "${deleteTarget.project.name}". ${entryCountText(deleteTarget.project._count.timeEntries)} logged against it will be moved to an "Unassigned" bucket so historical reports stay accurate. This cannot be undone.`
+              : `This permanently deletes "${deleteTarget.project.name}". This cannot be undone.`
+          }
+          busy={deleteBusy}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }
