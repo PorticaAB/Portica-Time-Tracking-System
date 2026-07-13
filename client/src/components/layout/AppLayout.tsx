@@ -2,58 +2,119 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import clsx from "../../lib/clsx";
 
+function Icon({ path }: { path: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+      <path d={path} />
+    </svg>
+  );
+}
+
+const ICONS = {
+  dashboard: "M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6V11h-6v9Zm0-16v5h6V4h-6Z",
+  calendar: "M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+  team: "M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm10 10v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75",
+  reports: "M3 3v18h18M8 17V9m5 8V5m5 12v-6",
+  admin: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.14-1.4l2.1-1.63-2-3.46-2.48 1a7.5 7.5 0 0 0-2.42-1.4L14 2h-4l-.46 2.6a7.5 7.5 0 0 0-2.42 1.4l-2.48-1-2 3.46 2.1 1.63a7.4 7.4 0 0 0 0 2.8l-2.1 1.63 2 3.46 2.48-1c.72.6 1.53 1.07 2.42 1.4L10 22h4l.46-2.6a7.5 7.5 0 0 0 2.42-1.4l2.48 1 2-3.46-2.1-1.63c.09-.46.14-.93.14-1.4Z",
+  profile: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+  logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
+};
+
+// "Dashboard" is shown to preview the intended nav structure but isn't wired to a
+// real page yet - that's a new screen, pending confirmation of the overall plan.
 const contractorLinks = [
-  { to: "/", label: "Calendar" },
-  { to: "/reports", label: "Reports" },
-  { to: "/profile", label: "Profile" },
+  { to: null, label: "Dashboard", icon: ICONS.dashboard },
+  { to: "/", label: "Calendar", icon: ICONS.calendar },
+  { to: "/reports", label: "Reports", icon: ICONS.reports },
 ];
 
 const adminLinks = [
-  { to: "/", label: "Calendar" },
-  { to: "/admin/contractors", label: "Contractors" },
-  { to: "/admin/clients", label: "Clients & Projects" },
-  { to: "/admin/holidays", label: "Holidays" },
-  { to: "/reports", label: "Reports" },
+  { to: null, label: "Dashboard", icon: ICONS.dashboard },
+  { to: "/", label: "Calendar", icon: ICONS.calendar },
+  { to: "/admin/contractors", label: "Team", icon: ICONS.team },
+  { to: "/reports", label: "Reports", icon: ICONS.reports },
+  { to: "/admin/holidays", label: "Admin", icon: ICONS.admin },
 ];
 
 export function AppLayout() {
   const { user, logout } = useAuth();
   const links = user?.role === "ADMIN" ? adminLinks : contractorLinks;
+  const initials = (user?.name ?? "")
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-line bg-surface px-6 py-3">
-        <div className="flex items-center gap-8">
-          <span className="font-display text-xl font-semibold tracking-tight text-brand-700">Klocka</span>
-          <nav className="flex gap-1">
-            {links.map((link) => (
+    <div className="flex h-screen">
+      <aside className="flex w-60 flex-none flex-col border-r border-line bg-surface">
+        <div className="px-5 pt-6 pb-5">
+          <span className="font-display text-2xl font-semibold tracking-tight text-brand-700">Klocka</span>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-3">
+          {links.map((link) =>
+            link.to === null ? (
+              <div
+                key={link.label}
+                title="Coming soon"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-faint/70"
+              >
+                <Icon path={link.icon} />
+                {link.label}
+                <span className="ml-auto rounded-full bg-line-soft px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+                  Soon
+                </span>
+              </div>
+            ) : (
               <NavLink
                 key={link.to}
                 to={link.to}
                 end={link.to === "/"}
                 className={({ isActive }) =>
                   clsx(
-                    "rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                     isActive ? "bg-brand-50 text-brand-700" : "text-ink-muted hover:bg-line-soft hover:text-ink"
                   )
                 }
               >
+                <Icon path={link.icon} />
                 {link.label}
               </NavLink>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-ink-muted">{user?.name}</span>
+            )
+          )}
+        </nav>
+
+        <div className="border-t border-line p-3">
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              clsx(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-150",
+                isActive ? "bg-brand-50" : "hover:bg-line-soft"
+              )
+            }
+          >
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
+              {initials || "?"}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-ink">{user?.name}</span>
+              <span className="block truncate text-xs text-ink-faint">{user?.role === "ADMIN" ? "Coach" : "Team member"}</span>
+            </span>
+          </NavLink>
           <button
             onClick={logout}
-            className="rounded-lg border border-line px-3 py-1.5 text-ink-muted transition-all duration-150 hover:bg-line-soft hover:text-ink active:scale-[0.98]"
+            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-muted transition-all duration-150 hover:bg-line-soft hover:text-ink"
           >
+            <Icon path={ICONS.logout} />
             Log out
           </button>
         </div>
-      </header>
-      <main className="flex-1 overflow-hidden">
+      </aside>
+
+      <main className="flex-1 overflow-hidden bg-canvas">
         <Outlet />
       </main>
     </div>
