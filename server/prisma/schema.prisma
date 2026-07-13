@@ -13,18 +13,27 @@ enum Role {
   CONTRACTOR
 }
 
+// Free-text-ish label for how a non-admin user is shown in the UI ("Team
+// Member" vs "Coach"). Orthogonal to Role, which still governs access.
+enum MemberRole {
+  TEAM_MEMBER
+  COACH
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String      @id @default(cuid())
+  email        String      @unique
   passwordHash String
   name         String
-  role         Role     @default(CONTRACTOR)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  phone        String?
+  role         Role        @default(CONTRACTOR)
+  memberRole   MemberRole? @default(TEAM_MEMBER)
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  assignments  ProjectAssignment[]
-  timeEntries  TimeEntry[]
+  timeEntries     TimeEntry[]
+  taskAssignments TaskAssignment[]
 
   @@map("users")
 }
@@ -53,29 +62,15 @@ model Project {
 
   client        Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tasks         Task[]
-  assignments   ProjectAssignment[]
   timeEntries   TimeEntry[]
 
   @@index([clientId])
   @@map("projects")
 }
 
-// Contractors assigned to a project - controls who can log time against it
-model ProjectAssignment {
-  id        String   @id @default(cuid())
-  projectId String
-  userId    String
-  createdAt DateTime @default(now())
-
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, userId])
-  @@index([userId])
-  @@map("project_assignments")
-}
-
-// Project-scoped premade task labels (e.g. "Design", "Client Call")
+// Project-scoped premade task labels (e.g. "Design", "Client Call").
+// Admins can assign specific tasks to specific team members; a task with no
+// assignments is open to everyone (see TaskAssignment).
 model Task {
   id        String   @id @default(cuid())
   name      String
@@ -83,12 +78,27 @@ model Task {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
+  assignments TaskAssignment[]
 
   @@unique([projectId, name])
   @@index([projectId])
   @@map("tasks")
+}
+
+model TaskAssignment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@map("task_assignments")
 }
 
 model TimeEntry {

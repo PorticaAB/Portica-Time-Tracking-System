@@ -9,17 +9,22 @@ const router = Router();
 
 router.use(requireAuth);
 
-async function assertProjectAccess(userId: string, role: string, projectId: string) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: { assignments: true },
-  });
-  if (!project || !project.isActive) throw new HttpError(404, "Project not found");
-  if (role !== "ADMIN") {
-    const assigned = project.assignments.some((a) => a.userId === userId);
-    if (!assigned) throw new HttpError(403, "You are not assigned to this project");
-  }
+// Clients/Projects are flat tags - any active team member can log time
+// against any active project. Only Tasks can be scoped to specific people.
+async function assertProjectAccess(role: string, projectId: string) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new HttpError(404, "Project not found");
+  if (role !== "ADMIN" && !project.isActive) throw new HttpError(404, "Project not found");
   return project;
+}
+
+async function assertTaskAccess(userId: string, role: string, taskId: string, projectId: string) {
+  const task = await prisma.task.findUnique({ where: { id: taskId }, include: { assignments: true } });
+  if (!task || task.projectId !== projectId) throw new HttpError(400, "Task does not belong to this project");
+  if (role !== "ADMIN" && task.assignments.length > 0) {
+    const assigned = task.assignments.some((a) => a.userId === userId);
+    if (!assigned) throw new HttpError(403, "This task is not assigned to you");
+  }
 }
 
 const listQuerySchema = z.object({
@@ -81,7 +86,8 @@ router.post(
   "/start",
   asyncHandler(async (req, res) => {
     const data = startSchema.parse(req.body);
-    await assertProjectAccess(req.user!.sub, req.user!.role, data.projectId);
+    await assertProjectAccess(req.user!.role, data.projectId);
+    if (data.taskId) await assertTaskAccess(req.user!.sub, req.user!.role, data.taskId, data.projectId);
 
     // Only one running timer per contractor at a time - stop any existing one.
     await prisma.timeEntry.updateMany({
@@ -133,7 +139,8 @@ router.post(
   "/",
   asyncHandler(async (req, res) => {
     const data = createSchema.parse(req.body);
-    await assertProjectAccess(req.user!.sub, req.user!.role, data.projectId);
+    await assertProjectAccess(req.user!.role, data.projectId);
+    if (data.taskId) await assertTaskAccess(req.user!.sub, req.user!.role, data.taskId, data.projectId);
 
     const startTime = new Date(data.startTime);
     const endTime = new Date(data.endTime);
@@ -172,7 +179,9 @@ router.patch(
     }
 
     const data = updateSchema.parse(req.body);
-    if (data.projectId) await assertProjectAccess(req.user!.sub, req.user!.role, data.projectId);
+    const effectiveProjectId = data.projectId ?? existing.projectId;
+    if (data.projectId) await assertProjectAccess(req.user!.role, data.projectId);
+    if (data.taskId) await assertTaskAccess(req.user!.sub, req.user!.role, data.taskId, effectiveProjectId);
 
     const startTime = data.startTime ? new Date(data.startTime) : existing.startTime;
     const endTime = data.endTime === undefined ? existing.endTime : data.endTime === null ? null : new Date(data.endTime);

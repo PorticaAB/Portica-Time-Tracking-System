@@ -89,9 +89,9 @@ export default function ReportsPage() {
       <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4 shadow-soft">
         {isAdmin && (
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink-muted">Contractor</label>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Team Member</label>
             <select value={userId} onChange={(e) => setUserId(e.target.value)} className={fieldClass}>
-              <option value="">All contractors</option>
+              <option value="">All team members</option>
               {contractors.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}

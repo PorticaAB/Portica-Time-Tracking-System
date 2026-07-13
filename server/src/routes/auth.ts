@@ -42,12 +42,13 @@ router.get(
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
     if (!user || !user.isActive) return res.status(404).json({ error: "User not found" });
-    res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
+    res.json({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role, memberRole: user.memberRole });
   })
 );
 
 const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
+  phone: z.string().nullable().optional(),
   password: z.string().min(8).optional(),
 });
 
@@ -56,12 +57,13 @@ router.patch(
   requireAuth,
   asyncHandler(async (req, res) => {
     const data = updateProfileSchema.parse(req.body);
-    const update: { name?: string; passwordHash?: string } = {};
+    const update: { name?: string; phone?: string | null; passwordHash?: string } = {};
     if (data.name) update.name = data.name;
+    if (data.phone !== undefined) update.phone = data.phone || null;
     if (data.password) update.passwordHash = await bcrypt.hash(data.password, 10);
 
     const user = await prisma.user.update({ where: { id: req.user!.sub }, data: update });
-    res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
+    res.json({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role, memberRole: user.memberRole });
   })
 );
 

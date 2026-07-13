@@ -8,29 +8,19 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Admin: full client list. Contractors: only clients that have at least one
-// project they're assigned to (used to populate log-time pickers).
+// Clients are flat tags. Admins see everything (including inactive, for
+// management); everyone else just sees active clients with active projects.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    if (req.user!.role === "ADMIN") {
-      const clients = await prisma.client.findMany({
-        orderBy: { name: "asc" },
-        include: { projects: { select: { id: true, name: true, isActive: true } } },
-      });
-      return res.json(clients);
-    }
-
+    const isAdmin = req.user!.role === "ADMIN";
     const clients = await prisma.client.findMany({
-      where: {
-        isActive: true,
-        projects: { some: { isActive: true, assignments: { some: { userId: req.user!.sub } } } },
-      },
+      where: isAdmin ? undefined : { isActive: true, projects: { some: { isActive: true } } },
       orderBy: { name: "asc" },
       include: {
         projects: {
-          where: { isActive: true, assignments: { some: { userId: req.user!.sub } } },
-          select: { id: true, name: true },
+          where: isAdmin ? undefined : { isActive: true },
+          select: { id: true, name: true, isActive: true },
         },
       },
     });

@@ -15,6 +15,7 @@ async function main() {
       name: "Catarina Bertling",
       passwordHash: adminPasswordHash,
       role: "ADMIN",
+      memberRole: null,
     },
   });
 
@@ -27,6 +28,8 @@ async function main() {
       name: "Anna Andersson",
       passwordHash: contractorPasswordHash,
       role: "CONTRACTOR",
+      memberRole: "TEAM_MEMBER",
+      phone: "+46 70 123 45 67",
     },
   });
 
@@ -48,12 +51,6 @@ async function main() {
     },
   });
 
-  await prisma.projectAssignment.upsert({
-    where: { projectId_userId: { projectId: project.id, userId: contractor.id } },
-    update: {},
-    create: { projectId: project.id, userId: contractor.id },
-  });
-
   for (const name of ["Design", "Client Call", "Revisions", "Development"]) {
     await prisma.task.upsert({
       where: { projectId_name: { projectId: project.id, name } },
@@ -73,7 +70,7 @@ async function main() {
     }
   }
 
-  console.log("Seed complete.");
+  console.log("Seed complete.", { contractorId: contractor.id });
 }
 
 main()

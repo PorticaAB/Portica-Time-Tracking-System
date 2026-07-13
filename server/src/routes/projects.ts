@@ -8,31 +8,35 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Admin: all projects. Contractors: only projects they're assigned to (active).
+// Clients/Projects are simple flat tags - every active team member can log
+// time against any active project. Only premade Tasks within a project can
+// be scoped to specific people (see the task assignment endpoints below).
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    if (req.user!.role === "ADMIN") {
-      const projects = await prisma.project.findMany({
-        orderBy: { name: "asc" },
-        include: {
-          client: { select: { id: true, name: true } },
-          tasks: { orderBy: { name: "asc" } },
-          assignments: { include: { user: { select: { id: true, name: true, email: true } } } },
-        },
-      });
-      return res.json(projects);
-    }
-
+    const isAdmin = req.user!.role === "ADMIN";
     const projects = await prisma.project.findMany({
-      where: { isActive: true, assignments: { some: { userId: req.user!.sub } } },
+      where: isAdmin ? undefined : { isActive: true },
       orderBy: { name: "asc" },
       include: {
         client: { select: { id: true, name: true } },
-        tasks: { where: { isActive: true }, orderBy: { name: "asc" } },
+        tasks: {
+          where: isAdmin ? undefined : { isActive: true },
+          orderBy: { name: "asc" },
+          include: { assignments: { select: { userId: true } } },
+        },
       },
     });
-    res.json(projects);
+
+    if (isAdmin) return res.json(projects);
+
+    // Non-admins only see tasks that are either open to everyone (no
+    // assignments at all) or specifically assigned to them.
+    const scoped = projects.map((p) => ({
+      ...p,
+      tasks: p.tasks.filter((t) => t.assignments.length === 0 || t.assignments.some((a) => a.userId === req.user!.sub)),
+    }));
+    res.json(scoped);
   })
 );
 
@@ -43,15 +47,12 @@ router.get(
       where: { id: req.params.id },
       include: {
         client: true,
-        tasks: true,
-        assignments: { include: { user: { select: { id: true, name: true, email: true } } } },
+        tasks: { include: { assignments: { include: { user: { select: { id: true, name: true } } } } } },
       },
     });
     if (!project) return res.status(404).json({ error: "Project not found" });
-
-    if (req.user!.role !== "ADMIN") {
-      const assigned = project.assignments.some((a) => a.userId === req.user!.sub);
-      if (!assigned) return res.status(403).json({ error: "Not assigned to this project" });
+    if (req.user!.role !== "ADMIN" && !project.isActive) {
+      return res.status(404).json({ error: "Project not found" });
     }
     res.json(project);
   })
@@ -64,7 +65,6 @@ const createSchema = z.object({
   clientId: z.string().min(1),
   billableRate: z.number().nonnegative().nullable().optional(),
   currency: z.string().min(1).optional(),
-  assignedUserIds: z.array(z.string()).optional(),
 });
 
 router.post(
@@ -77,11 +77,8 @@ router.post(
         clientId: data.clientId,
         billableRate: data.billableRate ?? null,
         currency: data.currency ?? "SEK",
-        assignments: data.assignedUserIds
-          ? { create: data.assignedUserIds.map((userId) => ({ userId })) }
-          : undefined,
       },
-      include: { client: true, assignments: { include: { user: true } } },
+      include: { client: true },
     });
     res.status(201).json(project);
   })
@@ -109,32 +106,6 @@ router.delete(
   asyncHandler(async (req, res) => {
     const project = await prisma.project.update({ where: { id: req.params.id }, data: { isActive: false } });
     res.json(project);
-  })
-);
-
-// --- Contractor assignments ---
-
-const setAssignmentsSchema = z.object({ userIds: z.array(z.string()) });
-
-router.put(
-  "/:id/assignments",
-  asyncHandler(async (req, res) => {
-    const { userIds } = setAssignmentsSchema.parse(req.body);
-    const projectId = req.params.id;
-
-    await prisma.$transaction([
-      prisma.projectAssignment.deleteMany({ where: { projectId } }),
-      prisma.projectAssignment.createMany({
-        data: userIds.map((userId) => ({ projectId, userId })),
-        skipDuplicates: true,
-      }),
-    ]);
-
-    const assignments = await prisma.projectAssignment.findMany({
-      where: { projectId },
-      include: { user: { select: { id: true, name: true, email: true } } },
-    });
-    res.json(assignments);
   })
 );
 
@@ -167,6 +138,32 @@ router.delete(
   asyncHandler(async (req, res) => {
     await prisma.task.delete({ where: { id: req.params.taskId } });
     res.status(204).end();
+  })
+);
+
+// --- Per-task team member assignment ---
+
+const setTaskAssignmentsSchema = z.object({ userIds: z.array(z.string()) });
+
+router.put(
+  "/tasks/:taskId/assignments",
+  asyncHandler(async (req, res) => {
+    const { userIds } = setTaskAssignmentsSchema.parse(req.body);
+    const taskId = req.params.taskId;
+
+    await prisma.$transaction([
+      prisma.taskAssignment.deleteMany({ where: { taskId } }),
+      prisma.taskAssignment.createMany({
+        data: userIds.map((userId) => ({ taskId, userId })),
+        skipDuplicates: true,
+      }),
+    ]);
+
+    const assignments = await prisma.taskAssignment.findMany({
+      where: { taskId },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    res.json(assignments);
   })
 );
 

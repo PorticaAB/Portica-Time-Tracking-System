@@ -55,60 +55,66 @@ export default function HolidaysPage() {
     load();
   }
 
+  const fieldClass =
+    "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+
   return (
     <div className="mx-auto max-w-2xl overflow-y-auto p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900">Swedish public holidays</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Swedish public holidays</h1>
         <div className="flex items-center gap-2">
-          <button onClick={() => setYear((y) => y - 1)} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
+          <button onClick={() => setYear((y) => y - 1)} className="rounded-lg px-2 py-1 text-ink-muted transition-colors duration-150 hover:bg-line-soft hover:text-ink">
             ‹
           </button>
-          <span className="w-14 text-center font-medium">{year}</span>
-          <button onClick={() => setYear((y) => y + 1)} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
+          <span className="w-14 text-center font-medium text-ink">{year}</span>
+          <button onClick={() => setYear((y) => y + 1)} className="rounded-lg px-2 py-1 text-ink-muted transition-colors duration-150 hover:bg-line-soft hover:text-ink">
             ›
           </button>
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="ml-3 rounded-md border border-brand-300 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            className="ml-3 rounded-lg border border-brand-200 px-3 py-1.5 text-sm font-medium text-brand-700 transition-all duration-150 hover:bg-brand-50 active:scale-[0.98] disabled:opacity-50"
           >
             {syncing ? "Syncing…" : `Sync ${year}`}
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onCreate)} className="mb-6 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-4">
+      <form onSubmit={handleSubmit(onCreate)} className="mb-6 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface p-4 shadow-soft">
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Date</label>
-          <input type="date" {...register("date", { required: true })} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          <label className="mb-1 block text-xs font-medium text-ink-muted">Date</label>
+          <input type="date" {...register("date", { required: true })} className={fieldClass} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Name</label>
-          <input {...register("name", { required: true })} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          <label className="mb-1 block text-xs font-medium text-ink-muted">Name</label>
+          <input {...register("name", { required: true })} className={fieldClass} />
         </div>
-        <button disabled={isSubmitting} className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+        <button
+          disabled={isSubmitting}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98] disabled:opacity-50"
+        >
           Add / update
         </button>
       </form>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-soft">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
+          <thead className="bg-line-soft/60 text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
             <tr>
-              <th className="px-4 py-2">Date</th>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2" />
+              <th className="px-4 py-2.5">Date</th>
+              <th className="px-4 py-2.5">Name</th>
+              <th className="px-4 py-2.5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {holidays.map((h) => (
-              <tr key={h.id}>
-                <td className="px-4 py-2 text-slate-600">{h.date.slice(0, 10)}</td>
-                <td className="px-4 py-2 font-medium text-slate-800">{h.name}</td>
-                <td className="px-4 py-2 text-right">
-                  <button onClick={() => handleDelete(h.id)} className="text-slate-400 hover:text-red-600">
+              <tr key={h.id} className="transition-colors duration-150 hover:bg-line-soft/30">
+                <td className="px-4 py-2.5 text-ink-muted">{h.date.slice(0, 10)}</td>
+                <td className="px-4 py-2.5 font-medium text-ink">{h.name}</td>
+                <td className="px-4 py-2.5 text-right">
+                  <button onClick={() => handleDelete(h.id)} className="text-ink-faint transition-colors duration-150 hover:text-danger-600">
                     Remove
                   </button>
                 </td>
@@ -116,7 +122,7 @@ export default function HolidaysPage() {
             ))}
             {holidays.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={3} className="px-4 py-6 text-center text-ink-faint">
                   No holidays for {year} yet. Use "Sync {year}" to populate automatically.
                 </td>
               </tr>

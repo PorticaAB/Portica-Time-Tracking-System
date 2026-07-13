@@ -1,10 +1,13 @@
 export type Role = "ADMIN" | "CONTRACTOR";
+export type MemberRole = "TEAM_MEMBER" | "COACH";
 
 export interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string | null;
   role: Role;
+  memberRole?: MemberRole | null;
   isActive?: boolean;
   createdAt?: string;
 }
@@ -16,18 +19,19 @@ export interface ClientRecord {
   projects?: { id: string; name: string; isActive?: boolean }[];
 }
 
+export interface TaskAssignment {
+  id: string;
+  taskId: string;
+  userId: string;
+  user: { id: string; name: string; email: string };
+}
+
 export interface ProjectTask {
   id: string;
   name: string;
   projectId: string;
   isActive: boolean;
-}
-
-export interface ProjectAssignment {
-  id: string;
-  projectId: string;
-  userId: string;
-  user: { id: string; name: string; email: string };
+  assignments?: TaskAssignment[] | { userId: string }[];
 }
 
 export interface Project {
@@ -39,7 +43,6 @@ export interface Project {
   currency: string | null;
   client: { id: string; name: string };
   tasks: ProjectTask[];
-  assignments?: ProjectAssignment[];
 }
 
 export interface TimeEntry {

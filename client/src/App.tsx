@@ -2,11 +2,12 @@ import { Routes, Route } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
+import DashboardPage from "./pages/DashboardPage";
 import CalendarPage from "./pages/CalendarPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProfilePage from "./pages/ProfilePage";
-import ContractorsPage from "./pages/admin/ContractorsPage";
-import ClientsProjectsPage from "./pages/admin/ClientsProjectsPage";
+import TeamPage from "./pages/admin/TeamPage";
+import ProjectsPage from "./pages/admin/ProjectsPage";
 import HolidaysPage from "./pages/admin/HolidaysPage";
 
 export default function App() {
@@ -16,13 +17,14 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<CalendarPage />} />
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
 
           <Route element={<ProtectedRoute roles={["ADMIN"]} />}>
-            <Route path="/admin/contractors" element={<ContractorsPage />} />
-            <Route path="/admin/clients" element={<ClientsProjectsPage />} />
+            <Route path="/admin/team" element={<TeamPage />} />
+            <Route path="/admin/projects" element={<ProjectsPage />} />
             <Route path="/admin/holidays" element={<HolidaysPage />} />
           </Route>
         </Route>

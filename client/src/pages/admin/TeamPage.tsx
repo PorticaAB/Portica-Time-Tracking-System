@@ -1,0 +1,302 @@
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { api, getErrorMessage } from "../../lib/api";
+import type { MemberRole, User } from "../../types";
+import clsx from "../../lib/clsx";
+
+interface CreateForm {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+}
+
+interface EditForm {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
+function RoleToggle({ value, onChange, disabled }: { value: MemberRole; onChange: (v: MemberRole) => void; disabled?: boolean }) {
+  return (
+    <div className="inline-flex rounded-lg border border-line bg-line-soft/40 p-0.5">
+      {(["TEAM_MEMBER", "COACH"] as MemberRole[]).map((option) => (
+        <button
+          key={option}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(option)}
+          className={clsx(
+            "rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150",
+            value === option ? "bg-surface text-brand-700 shadow-soft" : "text-ink-muted hover:text-ink"
+          )}
+        >
+          {option === "TEAM_MEMBER" ? "Team Member" : "Coach"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function roleLabel(memberRole: MemberRole | null | undefined) {
+  return memberRole === "COACH" ? "Coach" : "Team Member";
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+export default function TeamPage() {
+  const [team, setTeam] = useState<User[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [newRole, setNewRole] = useState<MemberRole>("TEAM_MEMBER");
+  const [editing, setEditing] = useState<User | null>(null);
+  const [editRole, setEditRole] = useState<MemberRole>("TEAM_MEMBER");
+
+  const createForm = useForm<CreateForm>();
+  const editForm = useForm<EditForm>();
+
+  async function load() {
+    const res = await api.get<User[]>("/contractors");
+    setTeam(res.data);
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function onCreate(data: CreateForm) {
+    setError(null);
+    try {
+      await api.post("/contractors", { ...data, memberRole: newRole, phone: data.phone || undefined });
+      createForm.reset();
+      setNewRole("TEAM_MEMBER");
+      load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  function openEdit(member: User) {
+    setEditing(member);
+    setEditRole(member.memberRole ?? "TEAM_MEMBER");
+    editForm.reset({ name: member.name, email: member.email, phone: member.phone ?? "", password: "" });
+  }
+
+  async function onSaveEdit(data: EditForm) {
+    if (!editing) return;
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone || null,
+        memberRole: editRole,
+      };
+      if (data.password) payload.password = data.password;
+      await api.patch(`/contractors/${editing.id}`, payload);
+      setEditing(null);
+      load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function toggleActive(member: User) {
+    await api.patch(`/contractors/${member.id}`, { isActive: !member.isActive });
+    load();
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl overflow-y-auto p-8">
+      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight text-ink">Team</h1>
+
+      <form onSubmit={createForm.handleSubmit(onCreate)} className="mb-8 rounded-xl border border-line bg-surface p-5 shadow-soft">
+        <p className="mb-3 text-sm font-medium text-ink">Add a team member</p>
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-medium text-ink-muted">Role</label>
+          <RoleToggle value={newRole} onChange={setNewRole} />
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Name</label>
+            <input
+              {...createForm.register("name", { required: true })}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Email</label>
+            <input
+              type="email"
+              {...createForm.register("email", { required: true })}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Phone (optional)</label>
+            <input
+              type="tel"
+              {...createForm.register("phone")}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Initial password</label>
+            <input
+              type="password"
+              {...createForm.register("password", { required: true, minLength: 8 })}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <button
+            disabled={createForm.formState.isSubmitting}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98] disabled:opacity-50"
+          >
+            Add member
+          </button>
+        </div>
+      </form>
+
+      {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
+
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-soft">
+        <table className="w-full text-sm">
+          <thead className="bg-line-soft/60 text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+            <tr>
+              <th className="px-4 py-2.5">Name</th>
+              <th className="px-4 py-2.5">Role</th>
+              <th className="px-4 py-2.5">Contact</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {team.map((member) => (
+              <tr key={member.id} className="transition-colors duration-150 hover:bg-line-soft/30">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
+                      {initials(member.name)}
+                    </span>
+                    <span className="font-medium text-ink">{member.name}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={clsx(
+                      "rounded-full px-2 py-0.5 text-xs font-medium",
+                      member.memberRole === "COACH" ? "bg-accent-50 text-accent-700" : "bg-brand-50 text-brand-700"
+                    )}
+                  >
+                    {roleLabel(member.memberRole)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-ink-muted">
+                  <div>{member.email}</div>
+                  {member.phone && <div className="text-xs text-ink-faint">{member.phone}</div>}
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={clsx(
+                      "rounded-full px-2 py-0.5 text-xs font-medium",
+                      member.isActive ? "bg-brand-50 text-brand-700" : "bg-line-soft text-ink-faint"
+                    )}
+                  >
+                    {member.isActive ? "Active" : "Inactive"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button onClick={() => openEdit(member)} className="mr-3 font-medium text-brand-600 hover:underline">
+                    Edit
+                  </button>
+                  <button onClick={() => toggleActive(member)} className="text-ink-faint hover:underline">
+                    {member.isActive ? "Deactivate" : "Activate"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {team.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center text-ink-faint">
+                  No team members yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/20 backdrop-blur-[2px]" onClick={() => setEditing(null)}>
+          <form
+            onSubmit={editForm.handleSubmit(onSaveEdit)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-96 rounded-xl border border-line bg-surface p-5 shadow-soft-lg"
+          >
+            <h3 className="mb-4 font-display text-base font-semibold text-ink">Edit team member</h3>
+
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-medium text-ink-muted">Role</label>
+              <RoleToggle value={editRole} onChange={setEditRole} />
+            </div>
+
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-ink-muted">Name</label>
+              <input
+                {...editForm.register("name", { required: true })}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-ink-muted">Email</label>
+              <input
+                type="email"
+                {...editForm.register("email", { required: true })}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-ink-muted">Phone</label>
+              <input
+                type="tel"
+                {...editForm.register("phone")}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-ink-muted">New password (leave blank to keep current)</label>
+              <input
+                type="password"
+                {...editForm.register("password", { minLength: 8 })}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted transition-all duration-150 hover:bg-line-soft active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98]"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
