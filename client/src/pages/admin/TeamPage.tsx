@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { api, getErrorMessage } from "../../lib/api";
+import { useAuth } from "../../contexts/AuthContext";
 import type { MemberRole, User } from "../../types";
 import clsx from "../../lib/clsx";
 import DevLinkNotice from "../../components/DevLinkNotice";
+import ConfirmActionDialog from "../../components/ConfirmActionDialog";
 
 interface CreateForm {
   name: string;
@@ -53,6 +55,7 @@ function initials(name: string) {
 }
 
 export default function TeamPage() {
+  const { user: currentUser, refreshUser } = useAuth();
   const [team, setTeam] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [newRole, setNewRole] = useState<MemberRole>("TEAM_MEMBER");
@@ -60,12 +63,15 @@ export default function TeamPage() {
   const [resendLinks, setResendLinks] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<User | null>(null);
   const [editRole, setEditRole] = useState<MemberRole>("TEAM_MEMBER");
+  const [adminAction, setAdminAction] = useState<{ member: User; makeAdmin: boolean } | null>(null);
+  const [adminActionBusy, setAdminActionBusy] = useState(false);
+  const [adminActionError, setAdminActionError] = useState<string | null>(null);
 
   const createForm = useForm<CreateForm>();
   const editForm = useForm<EditForm>();
 
   async function load() {
-    const res = await api.get<User[]>("/contractors");
+    const res = await api.get<User[]>("/contractors?includeAdmins=true");
     setTeam(res.data);
   }
 
@@ -137,6 +143,27 @@ export default function TeamPage() {
   async function toggleActive(member: User) {
     await api.patch(`/contractors/${member.id}`, { isActive: !member.isActive });
     load();
+  }
+
+  async function confirmAdminAction() {
+    if (!adminAction) return;
+    const { member, makeAdmin } = adminAction;
+    setAdminActionBusy(true);
+    setAdminActionError(null);
+    try {
+      await api.patch(`/contractors/${member.id}`, { role: makeAdmin ? "ADMIN" : "CONTRACTOR" });
+      setAdminAction(null);
+      // If the acting admin just changed their own access level, refresh
+      // the session so the sidebar/routes reflect it immediately - the
+      // account itself stays logged in either way, only its permissions
+      // for future requests change.
+      if (currentUser?.id === member.id) await refreshUser();
+      load();
+    } catch (err) {
+      setAdminActionError(getErrorMessage(err));
+    } finally {
+      setAdminActionBusy(false);
+    }
   }
 
   function statusBadge(member: User) {
@@ -218,14 +245,18 @@ export default function TeamPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <span
-                      className={clsx(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-                        member.memberRole === "COACH" ? "bg-accent-50 text-accent-700" : "bg-brand-50 text-brand-700"
-                      )}
-                    >
-                      {roleLabel(member.memberRole)}
-                    </span>
+                    {member.role === "ADMIN" ? (
+                      <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-medium text-canvas">Admin</span>
+                    ) : (
+                      <span
+                        className={clsx(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          member.memberRole === "COACH" ? "bg-accent-50 text-accent-700" : "bg-brand-50 text-brand-700"
+                        )}
+                      >
+                        {roleLabel(member.memberRole)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 align-top text-ink-muted">
                     <div>{member.email}</div>
@@ -243,8 +274,14 @@ export default function TeamPage() {
                         Resend invite
                       </button>
                     )}
-                    <button onClick={() => toggleActive(member)} className="text-ink-faint hover:underline">
+                    <button onClick={() => toggleActive(member)} className="mr-3 text-ink-faint hover:underline">
                       {member.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                    <button
+                      onClick={() => setAdminAction({ member, makeAdmin: member.role !== "ADMIN" })}
+                      className="text-accent-600 hover:underline"
+                    >
+                      {member.role === "ADMIN" ? "Remove Admin" : "Make Admin"}
                     </button>
                     {resendLink && (
                       <div className="mt-2 text-left">
@@ -275,10 +312,19 @@ export default function TeamPage() {
           >
             <h3 className="mb-4 font-display text-base font-semibold text-ink">Edit team member</h3>
 
-            <div className="mb-4">
-              <label className="mb-1.5 block text-xs font-medium text-ink-muted">Role</label>
-              <RoleToggle value={editRole} onChange={setEditRole} />
-            </div>
+            {editing.role === "ADMIN" ? (
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-ink-muted">Role</label>
+                <p className="text-sm text-ink-muted">
+                  Admin. Use "Remove Admin" on the Team page to revert them to a Team Member/Coach role.
+                </p>
+              </div>
+            ) : (
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-ink-muted">Role</label>
+                <RoleToggle value={editRole} onChange={setEditRole} />
+              </div>
+            )}
 
             <div className="mb-3">
               <label className="mb-1 block text-xs font-medium text-ink-muted">Name</label>
@@ -330,6 +376,25 @@ export default function TeamPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {adminAction && (
+        <ConfirmActionDialog
+          title={adminAction.makeAdmin ? `Make ${adminAction.member.name} an admin?` : `Remove admin access from ${adminAction.member.name}?`}
+          description={
+            adminAction.makeAdmin
+              ? "They'll get full access to manage team members, clients/projects, tasks, and see everyone's time entries and reports."
+              : `They'll be reverted to a ${roleLabel(adminAction.member.memberRole)} and lose access to admin-only areas (Team, Projects, Reports for others, Holidays).`
+          }
+          confirmLabel={adminAction.makeAdmin ? "Make Admin" : "Remove Admin"}
+          busy={adminActionBusy}
+          error={adminActionError}
+          onConfirm={confirmAdminAction}
+          onCancel={() => {
+            setAdminAction(null);
+            setAdminActionError(null);
+          }}
+        />
       )}
     </div>
   );
