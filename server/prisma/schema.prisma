@@ -20,6 +20,11 @@ enum MemberRole {
   COACH
 }
 
+enum TokenPurpose {
+  PASSWORD_RESET
+  INVITE
+}
+
 model User {
   id           String      @id @default(cuid())
   email        String      @unique
@@ -29,13 +34,34 @@ model User {
   role         Role        @default(CONTRACTOR)
   memberRole   MemberRole? @default(TEAM_MEMBER)
   isActive     Boolean     @default(true)
+  // Null = invited but hasn't set their own password yet. Set immediately for
+  // accounts created directly (seed/admin), and on successful invite acceptance.
+  activatedAt  DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   timeEntries     TimeEntry[]
   taskAssignments TaskAssignment[]
+  authTokens      AuthToken[]
 
   @@map("users")
+}
+
+// Password-reset and invite-to-set-password links. Only a SHA-256 hash of the
+// raw token is stored - the raw value only ever exists in the emailed link.
+model AuthToken {
+  id        String       @id @default(cuid())
+  userId    String
+  tokenHash String       @unique
+  purpose   TokenPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("auth_tokens")
 }
 
 model Client {

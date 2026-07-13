@@ -9,6 +9,7 @@ export interface User {
   role: Role;
   memberRole?: MemberRole | null;
   isActive?: boolean;
+  activatedAt?: string | null;
   createdAt?: string;
 }
 

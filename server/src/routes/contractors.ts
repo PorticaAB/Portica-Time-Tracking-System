@@ -1,9 +1,13 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
+import { issueToken } from "../lib/authTokens";
+import { sendEmail, getAppUrl } from "../lib/email";
+import { inviteEmailHtml } from "../lib/emailTemplates";
 
 const router = Router();
 
@@ -19,6 +23,7 @@ const selectFields = {
   role: true,
   memberRole: true,
   isActive: true,
+  activatedAt: true,
   createdAt: true,
 } as const;
 
@@ -34,10 +39,20 @@ router.get(
   })
 );
 
+async function sendInvite(user: { id: string; name: string; email: string }, inviterName: string) {
+  const { token } = await issueToken(user.id, "INVITE");
+  const inviteUrl = `${getAppUrl()}/accept-invite?token=${token}`;
+  const { sent } = await sendEmail({
+    to: user.email,
+    subject: "You're invited to Klocka",
+    html: inviteEmailHtml({ name: user.name, inviteUrl, inviterName }),
+  });
+  return { sent, inviteUrl };
+}
+
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
-  password: z.string().min(8),
   phone: z.string().optional(),
   memberRole: memberRoleSchema.default("TEAM_MEMBER"),
 });
@@ -51,19 +66,36 @@ router.post(
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: "A user with this email already exists" });
 
-    const passwordHash = await bcrypt.hash(data.password, 10);
+    // No admin-set password - the account is unusable until the invite is
+    // accepted and the member sets their own password.
+    const placeholderHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
     const user = await prisma.user.create({
       data: {
         email,
         name: data.name,
-        passwordHash,
+        passwordHash: placeholderHash,
         phone: data.phone || null,
         memberRole: data.memberRole,
         role: "CONTRACTOR",
+        activatedAt: null,
       },
       select: selectFields,
     });
-    res.status(201).json(user);
+
+    const { sent, inviteUrl } = await sendInvite(user, req.user!.name);
+    res.status(201).json({ ...user, devInviteLink: sent ? undefined : inviteUrl });
+  })
+);
+
+router.post(
+  "/:id/resend-invite",
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.activatedAt) return res.status(400).json({ error: "This member has already activated their account" });
+
+    const { sent, inviteUrl } = await sendInvite(user, req.user!.name);
+    res.json({ sent, devInviteLink: sent ? undefined : inviteUrl });
   })
 );
 

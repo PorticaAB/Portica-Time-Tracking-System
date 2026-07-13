@@ -3,11 +3,11 @@ import { useForm } from "react-hook-form";
 import { api, getErrorMessage } from "../../lib/api";
 import type { MemberRole, User } from "../../types";
 import clsx from "../../lib/clsx";
+import DevLinkNotice from "../../components/DevLinkNotice";
 
 interface CreateForm {
   name: string;
   email: string;
-  password: string;
   phone: string;
 }
 
@@ -56,6 +56,8 @@ export default function TeamPage() {
   const [team, setTeam] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [newRole, setNewRole] = useState<MemberRole>("TEAM_MEMBER");
+  const [newMemberInviteLink, setNewMemberInviteLink] = useState<string | null>(null);
+  const [resendLinks, setResendLinks] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<User | null>(null);
   const [editRole, setEditRole] = useState<MemberRole>("TEAM_MEMBER");
 
@@ -73,11 +75,35 @@ export default function TeamPage() {
 
   async function onCreate(data: CreateForm) {
     setError(null);
+    setNewMemberInviteLink(null);
     try {
-      await api.post("/contractors", { ...data, memberRole: newRole, phone: data.phone || undefined });
+      const res = await api.post<User & { devInviteLink?: string }>("/contractors", {
+        ...data,
+        memberRole: newRole,
+        phone: data.phone || undefined,
+      });
       createForm.reset();
       setNewRole("TEAM_MEMBER");
+      if (res.data.devInviteLink) setNewMemberInviteLink(res.data.devInviteLink);
       load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function resendInvite(member: User) {
+    setError(null);
+    try {
+      const res = await api.post<{ sent: boolean; devInviteLink?: string }>(`/contractors/${member.id}/resend-invite`);
+      if (res.data.devInviteLink) {
+        setResendLinks((prev) => ({ ...prev, [member.id]: res.data.devInviteLink! }));
+      } else {
+        setResendLinks((prev) => {
+          const next = { ...prev };
+          delete next[member.id];
+          return next;
+        });
+      }
     } catch (err) {
       setError(getErrorMessage(err));
     }
@@ -111,6 +137,12 @@ export default function TeamPage() {
   async function toggleActive(member: User) {
     await api.patch(`/contractors/${member.id}`, { isActive: !member.isActive });
     load();
+  }
+
+  function statusBadge(member: User) {
+    if (!member.isActive) return { label: "Inactive", className: "bg-line-soft text-ink-faint" };
+    if (!member.activatedAt) return { label: "Invited", className: "bg-accent-50 text-accent-700" };
+    return { label: "Active", className: "bg-brand-50 text-brand-700" };
   }
 
   return (
@@ -147,21 +179,15 @@ export default function TeamPage() {
               className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-muted">Initial password</label>
-            <input
-              type="password"
-              {...createForm.register("password", { required: true, minLength: 8 })}
-              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            />
-          </div>
           <button
             disabled={createForm.formState.isSubmitting}
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-soft transition-all duration-150 hover:bg-brand-700 hover:shadow-soft-md active:scale-[0.98] disabled:opacity-50"
           >
-            Add member
+            Send invite
           </button>
         </div>
+        <p className="mt-2 text-xs text-ink-faint">We'll email them a link to set up their own password.</p>
+        {newMemberInviteLink && <DevLinkNotice label="Invite link for the member you just added:" link={newMemberInviteLink} />}
       </form>
 
       {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
@@ -178,50 +204,57 @@ export default function TeamPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {team.map((member) => (
-              <tr key={member.id} className="transition-colors duration-150 hover:bg-line-soft/30">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
-                      {initials(member.name)}
+            {team.map((member) => {
+              const status = statusBadge(member);
+              const resendLink = resendLinks[member.id];
+              return (
+                <tr key={member.id} className="transition-colors duration-150 hover:bg-line-soft/30">
+                  <td className="px-4 py-3 align-top">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
+                        {initials(member.name)}
+                      </span>
+                      <span className="font-medium text-ink">{member.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <span
+                      className={clsx(
+                        "rounded-full px-2 py-0.5 text-xs font-medium",
+                        member.memberRole === "COACH" ? "bg-accent-50 text-accent-700" : "bg-brand-50 text-brand-700"
+                      )}
+                    >
+                      {roleLabel(member.memberRole)}
                     </span>
-                    <span className="font-medium text-ink">{member.name}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={clsx(
-                      "rounded-full px-2 py-0.5 text-xs font-medium",
-                      member.memberRole === "COACH" ? "bg-accent-50 text-accent-700" : "bg-brand-50 text-brand-700"
+                  </td>
+                  <td className="px-4 py-3 align-top text-ink-muted">
+                    <div>{member.email}</div>
+                    {member.phone && <div className="text-xs text-ink-faint">{member.phone}</div>}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", status.className)}>{status.label}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    <button onClick={() => openEdit(member)} className="mr-3 font-medium text-brand-600 hover:underline">
+                      Edit
+                    </button>
+                    {!member.activatedAt && member.isActive && (
+                      <button onClick={() => resendInvite(member)} className="mr-3 text-brand-600 hover:underline">
+                        Resend invite
+                      </button>
                     )}
-                  >
-                    {roleLabel(member.memberRole)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-ink-muted">
-                  <div>{member.email}</div>
-                  {member.phone && <div className="text-xs text-ink-faint">{member.phone}</div>}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={clsx(
-                      "rounded-full px-2 py-0.5 text-xs font-medium",
-                      member.isActive ? "bg-brand-50 text-brand-700" : "bg-line-soft text-ink-faint"
+                    <button onClick={() => toggleActive(member)} className="text-ink-faint hover:underline">
+                      {member.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                    {resendLink && (
+                      <div className="mt-2 text-left">
+                        <DevLinkNotice label="New invite link:" link={resendLink} />
+                      </div>
                     )}
-                  >
-                    {member.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => openEdit(member)} className="mr-3 font-medium text-brand-600 hover:underline">
-                    Edit
-                  </button>
-                  <button onClick={() => toggleActive(member)} className="text-ink-faint hover:underline">
-                    {member.isActive ? "Deactivate" : "Activate"}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
             {team.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-ink-faint">
@@ -271,10 +304,11 @@ export default function TeamPage() {
               />
             </div>
             <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-ink-muted">New password (leave blank to keep current)</label>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">Set password (optional override)</label>
               <input
                 type="password"
                 {...editForm.register("password", { minLength: 8 })}
+                placeholder="Leave blank to leave as-is"
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
