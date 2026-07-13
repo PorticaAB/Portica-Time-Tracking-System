@@ -68,11 +68,16 @@ Database is always **Neon** Postgres. For hosting the app, pick one:
 
 - **Database**: Neon Postgres. Grab both the pooled connection string (`DATABASE_URL`, hostname ends in
   `-pooler`) and the direct one (`DIRECT_URL`) from the Neon dashboard.
-- **Server → Vercel project #1** (root directory: `server/`). `server/vercel.json` builds via
-  `npm run build && npx prisma migrate deploy` — migrations apply automatically on every build, since
-  serverless has no persistent process to hook a start-time migration into — then rewrites all requests
-  to the `api/index.ts` function, which wraps the Express app from `src/app.ts`. Env vars: `DATABASE_URL`,
-  `DIRECT_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGIN` (the client's Vercel URL).
+- **Server → Vercel project #1** (root directory: `server/`). `server/vercel.json` uses an explicit
+  `@vercel/node` build pointed at `api/index.ts` (which wraps the Express app from `src/app.ts`) and
+  routes every request to it — this is the standard "Express as a single Vercel function" pattern, and
+  avoids Vercel's framework auto-detection, which otherwise expects a static `public/` output directory
+  and fails with "No Output Directory named 'public' found" for an API-only project. Since this build
+  mode has no custom build-command hook, `prisma generate` and (only when `VERCEL=1`, which Vercel sets
+  automatically) `prisma migrate deploy` run from a `postinstall` script instead, so migrations still
+  apply automatically on every deploy without a manual step, and without affecting `npm install` in local
+  dev or on Railway. Env vars: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGIN`
+  (the client's Vercel URL).
 - **Client → Vercel project #2** (root directory: `client/`). Standard Vite build; `client/vercel.json`
   rewrites all paths to `index.html` for client-side routing. Set `VITE_API_URL` to the server project's
   URL + `/api` (e.g. `https://portica-server.vercel.app/api`).
