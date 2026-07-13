@@ -8,17 +8,18 @@ clients/projects on a drag-and-drop calendar, track Swedish public holidays, and
 - **Client**: React + TypeScript, Vite, Tailwind CSS, a custom pointer-events calendar (Day/Week/Month
   with drag-move, drag-resize, and click-drag-create), Recharts, React Hook Form, Luxon
   (`Europe/Stockholm`-aware date logic).
-- **Server**: Node.js + Express, Prisma ORM, PostgreSQL. Structured to run as a single Vercel
-  serverless function (`api/index.ts` wraps the Express app; `vercel.json` rewrites all requests to it).
+- **Server**: Node.js + Express, Prisma ORM, PostgreSQL. Deployed as a normal long-running process on
+  Railway (`railway.json`); the Express app (`src/app.ts`) is also wrapped for Vercel serverless
+  (`api/index.ts` + `vercel.json`) as an alternative if you'd rather host it there instead.
 - **Auth**: JWT, role-based (`ADMIN` vs `CONTRACTOR`).
-- **Database**: PostgreSQL, intended for Neon via Vercel's Storage integration (`DATABASE_URL` pooled +
-  `DIRECT_URL` direct, both wired into `prisma/schema.prisma`).
+- **Database**: PostgreSQL via Neon (`DATABASE_URL` pooled + `DIRECT_URL` direct, both wired into
+  `prisma/schema.prisma`).
 
 ## Repository layout
 
 ```
-client/   React app (Vite)
-server/   Express API + Prisma schema, deployable as a Vercel serverless function
+client/   React app (Vite), deployed to Vercel
+server/   Express API + Prisma schema, deployed to Railway
 ```
 
 ## Local development
@@ -59,32 +60,33 @@ Easter-derived ones, and the nearest-weekend rule for Midsummer and All Saints' 
 - Manually add/edit/remove holidays (`/admin/holidays`).
 - Click "Sync `<year>`" to upsert the computed set for that year.
 
-## Deploying to Vercel
+## Deploying (Neon + Railway + Vercel)
 
-Deploy `client` and `server` as **two separate Vercel projects**, same pattern as the TIPI project.
+- **Database**: Neon Postgres. Grab both the pooled connection string (`DATABASE_URL`, hostname ends in
+  `-pooler`) and the direct one (`DIRECT_URL`) from the Neon dashboard.
+- **Server → Railway** (root directory: `server/`). `server/railway.json` sets the build command to
+  `npm run build` (`prisma generate` + `tsc`) and the start command to `npm run start`, which runs
+  `prisma migrate deploy` before booting the server — so the schema is applied automatically on every
+  deploy, no manual migration step. Required env vars: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`,
+  `JWT_EXPIRES_IN`, `CORS_ORIGIN` (the deployed client URL). `PORT` is set automatically by Railway.
+- **Client → Vercel** (root directory: `client/`). Standard Vite build (`npm run build`, output `dist/`);
+  `client/vercel.json` rewrites all paths to `index.html` for client-side routing. Set `VITE_API_URL` to
+  the deployed Railway backend URL + `/api` (e.g. `https://<service>.up.railway.app/api`) — see
+  `client/.env.example`.
 
-### Database (Neon via Vercel Storage)
+See the full manual setup checklist below for the exact dashboard steps.
 
-1. Add the Neon Postgres integration to your Vercel team/project.
-2. Copy the pooled connection string into `DATABASE_URL` and the direct (non-pooled) connection string
-   into `DIRECT_URL` for the server project's environment variables.
-3. Run `npx prisma migrate deploy` (e.g. via a one-off `vercel exec` or locally against the prod DB) to
-   apply migrations, then run the seed script once if you want the initial admin user.
+## Manual setup checklist (first-time deploy)
 
-### Server project (root directory: `server/`)
-
-Environment variables: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGIN` (the
-client's deployed URL).
-
-`server/vercel.json` builds via `npm run build` (runs `prisma generate` + `tsc`) and rewrites all
-requests to the `api/index.ts` serverless function, which wraps the Express app from `src/app.ts`.
-
-### Client project (root directory: `client/`)
-
-Build command `npm run build` (Vite). Set an environment-appropriate API base URL if not proxying
-through the same domain — currently the client calls relative `/api/...` paths, so put it behind the
-same domain as the server (e.g. via a Vercel rewrite) or update `client/src/lib/api.ts`'s `baseURL` to
-point at the deployed server URL.
+1. **Neon**: create an account/project at neon.tech, create a database, copy the pooled and direct
+   connection strings.
+2. **Railway**: create an account, connect the GitHub repo, add a service with root directory `server`,
+   set the env vars listed above, deploy.
+3. **Vercel**: create an account, connect the GitHub repo, add a project with root directory `client`,
+   set `VITE_API_URL` to the Railway URL, deploy.
+4. Update the Railway service's `CORS_ORIGIN` to the real Vercel URL once you have it, and redeploy.
+5. Run the seed script once (locally, pointed at the production `DATABASE_URL`/`DIRECT_URL`) if you want
+   the initial admin account, or create the first admin directly via `prisma studio` / SQL.
 
 ## Out of scope
 
