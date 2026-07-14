@@ -28,7 +28,12 @@ export default function CalendarPage() {
   const [createRange, setCreateRange] = useState<{ start: DateTime; end: DateTime } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const editable = !isAdmin;
+  // Admins get a "You" option alongside the team roster in the picker below,
+  // so they can log their own time (drag-to-create, timer, etc.) exactly
+  // like a Team Member/Coach, while still being able to switch to read-only
+  // oversight of someone else's calendar - the pre-existing admin ability.
+  const editable = isAdmin ? selectedContractorId === user?.id : true;
+  const activeProjects = useMemo(() => projects.filter((p) => p.isActive), [projects]);
 
   const range = useMemo(() => {
     if (viewMode === "day") {
@@ -45,14 +50,12 @@ export default function CalendarPage() {
   }, [anchor, viewMode]);
 
   useEffect(() => {
-    if (isAdmin) {
-      api.get<User[]>("/contractors").then((res) => {
-        setContractors(res.data);
-        if (!selectedContractorId && res.data.length > 0) setSelectedContractorId(res.data[0].id);
-      });
-    }
+    if (!isAdmin || !user) return;
+    // Default to the admin's own calendar rather than the first contractor.
+    setSelectedContractorId((prev) => prev || user.id);
+    api.get<User[]>("/contractors").then((res) => setContractors(res.data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [isAdmin, user?.id]);
 
   const loadEntries = useCallback(async () => {
     if (isAdmin && !selectedContractorId) {
@@ -132,7 +135,7 @@ export default function CalendarPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {!isAdmin && <TimerBar projects={projects} onEntryChanged={loadEntries} />}
+      {editable && <TimerBar projects={activeProjects} onEntryChanged={loadEntries} />}
 
       <div className="flex items-center justify-between border-b border-line bg-surface px-6 py-2.5">
         <div className="flex items-center gap-2">
@@ -157,6 +160,7 @@ export default function CalendarPage() {
               onChange={(e) => setSelectedContractorId(e.target.value)}
               className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             >
+              {user && <option value={user.id}>{user.name} (You)</option>}
               {contractors.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -207,7 +211,7 @@ export default function CalendarPage() {
             days={days}
             entries={entries}
             holidaySet={holidaySet}
-            projects={projects}
+            projects={editable ? activeProjects : projects}
             editable={editable}
             onCreate={(start, end) => setCreateRange({ start, end })}
             onUpdate={handleUpdate}
@@ -221,7 +225,7 @@ export default function CalendarPage() {
           day={createRange.start.startOf("day")}
           defaultStart={createRange.start}
           defaultEnd={createRange.end}
-          projects={projects}
+          projects={activeProjects}
           onClose={() => setCreateRange(null)}
           onCreate={handleCreate}
         />
