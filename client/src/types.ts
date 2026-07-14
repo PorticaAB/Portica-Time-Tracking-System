@@ -11,6 +11,7 @@ export interface User {
   isActive?: boolean;
   activatedAt?: string | null;
   createdAt?: string;
+  _count?: { timeEntries: number };
 }
 
 export interface ClientRecord {

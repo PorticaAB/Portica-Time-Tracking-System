@@ -6,6 +6,7 @@ import type { MemberRole, User } from "../../types";
 import clsx from "../../lib/clsx";
 import DevLinkNotice from "../../components/DevLinkNotice";
 import ConfirmActionDialog from "../../components/ConfirmActionDialog";
+import ConfirmDeleteDialog from "../../components/ConfirmDeleteDialog";
 
 interface CreateForm {
   name: string;
@@ -66,6 +67,9 @@ export default function TeamPage() {
   const [adminAction, setAdminAction] = useState<{ member: User; makeAdmin: boolean } | null>(null);
   const [adminActionBusy, setAdminActionBusy] = useState(false);
   const [adminActionError, setAdminActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const createForm = useForm<CreateForm>();
   const editForm = useForm<EditForm>();
@@ -163,6 +167,21 @@ export default function TeamPage() {
       setAdminActionError(getErrorMessage(err));
     } finally {
       setAdminActionBusy(false);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await api.delete(`/contractors/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      setDeleteError(getErrorMessage(err));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -279,9 +298,12 @@ export default function TeamPage() {
                     </button>
                     <button
                       onClick={() => setAdminAction({ member, makeAdmin: member.role !== "ADMIN" })}
-                      className="text-accent-600 hover:underline"
+                      className="mr-3 text-accent-600 hover:underline"
                     >
                       {member.role === "ADMIN" ? "Remove Admin" : "Make Admin"}
+                    </button>
+                    <button onClick={() => setDeleteTarget(member)} className="font-medium text-danger-600 hover:underline">
+                      Delete
                     </button>
                     {resendLink && (
                       <div className="mt-2 text-left">
@@ -393,6 +415,26 @@ export default function TeamPage() {
           onCancel={() => {
             setAdminAction(null);
             setAdminActionError(null);
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteDialog
+          title={`Delete ${deleteTarget.name}?`}
+          description={
+            deleteTarget._count?.timeEntries
+              ? `This permanently removes ${deleteTarget.name}'s account. ${
+                  deleteTarget._count.timeEntries === 1 ? "1 time entry" : `${deleteTarget._count.timeEntries} time entries`
+                } logged by them will be moved to a "Former Team Member" record so historical reports stay accurate. This cannot be undone.`
+              : `This permanently removes ${deleteTarget.name}'s account. This cannot be undone.`
+          }
+          busy={deleteBusy}
+          error={deleteError}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            setDeleteTarget(null);
+            setDeleteError(null);
           }}
         />
       )}

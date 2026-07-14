@@ -4,6 +4,7 @@ interface ConfirmDeleteDialogProps {
   title: string;
   description: string;
   busy?: boolean;
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -14,7 +15,7 @@ const CONFIRM_WORD = "DELETE";
 // modal chrome (fixed overlay + rounded panel) but in danger styling, and
 // requires typing the exact confirm word before the button enables - a
 // permanent delete should never be a single accidental click.
-export default function ConfirmDeleteDialog({ title, description, busy, onConfirm, onCancel }: ConfirmDeleteDialogProps) {
+export default function ConfirmDeleteDialog({ title, description, busy, error, onConfirm, onCancel }: ConfirmDeleteDialogProps) {
   const [value, setValue] = useState("");
   const confirmed = value === CONFIRM_WORD;
 
@@ -35,6 +36,7 @@ export default function ConfirmDeleteDialog({ title, description, busy, onConfir
           onChange={(e) => setValue(e.target.value)}
           className="mb-4 w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-danger-500 focus:outline-none focus:ring-2 focus:ring-danger-500/20"
         />
+        {error && <p className="mb-4 text-sm text-danger-600">{error}</p>}
         <div className="flex justify-end gap-2">
           <button
             type="button"

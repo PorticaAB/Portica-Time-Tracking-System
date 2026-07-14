@@ -34,6 +34,11 @@ model User {
   role         Role        @default(CONTRACTOR)
   memberRole   MemberRole? @default(TEAM_MEMBER)
   isActive     Boolean     @default(true)
+  // Marks the single system-managed "Former Team Member" placeholder that
+  // absorbs time entries orphaned by a permanent user delete. Hidden from
+  // listings and immune to further edit/delete, just like the Unassigned
+  // Client/Project bucket.
+  isSystem     Boolean     @default(false)
   // Null = invited but hasn't set their own password yet. Set immediately for
   // accounts created directly (seed/admin), and on successful invite acceptance.
   activatedAt  DateTime?

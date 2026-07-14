@@ -338,6 +338,7 @@ export default function ProjectsPage() {
               : `This permanently deletes "${deleteTarget.client.name}". This cannot be undone.`
           }
           busy={deleteBusy}
+          error={error}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />
@@ -352,6 +353,7 @@ export default function ProjectsPage() {
               : `This permanently deletes "${deleteTarget.project.name}". This cannot be undone.`
           }
           busy={deleteBusy}
+          error={error}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />

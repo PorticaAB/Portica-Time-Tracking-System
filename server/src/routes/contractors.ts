@@ -7,6 +7,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HttpError } from "../utils/HttpError";
+import { getOrCreateFormerMemberUserId } from "../lib/unassigned";
 import { issueToken } from "../lib/authTokens";
 import { sendEmail, getAppUrl } from "../lib/email";
 import { inviteEmailHtml } from "../lib/emailTemplates";
@@ -31,15 +32,16 @@ const selectFields = {
 
 // Other callers (calendar's "view as" picker, project task-assignment
 // pills) rely on this only ever returning contractors, so admins are
-// included only when the Team page explicitly asks for them.
+// included only when the Team page explicitly asks for them. The system
+// "Former Team Member" bucket is always hidden from listings.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
     const includeAdmins = req.query.includeAdmins === "true";
     const users = await prisma.user.findMany({
-      where: includeAdmins ? undefined : { role: "CONTRACTOR" },
+      where: includeAdmins ? { isSystem: false } : { role: "CONTRACTOR", isSystem: false },
       orderBy: { name: "asc" },
-      select: selectFields,
+      select: { ...selectFields, _count: { select: { timeEntries: true } } },
     });
     res.json(users);
   })
@@ -133,6 +135,9 @@ const updateSchema = z.object({
 router.patch(
   "/:id",
   asyncHandler(async (req, res) => {
+    const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.isSystem) return res.status(404).json({ error: "User not found" });
+
     const data = updateSchema.parse(req.body);
     await assertNotRemovingLastAdmin(req.params.id, data.role, data.isActive);
 
@@ -158,13 +163,29 @@ router.patch(
   })
 );
 
+// Permanent, irreversible delete. Any time entries logged by this user are
+// reassigned to the "Former Team Member" bucket first, so historical hours
+// in reports/calendar survive - only the byline is lost, not the logged
+// time itself. Task assignments and auth tokens cascade-delete with the
+// user, since neither carries any historical/reporting value on its own.
 router.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    // Deactivate rather than delete, to preserve historical time entries.
+    const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.isSystem) return res.status(404).json({ error: "User not found" });
+
     await assertNotRemovingLastAdmin(req.params.id, undefined, false);
-    const user = await prisma.user.update({ where: { id: req.params.id }, data: { isActive: false } });
-    res.json({ id: user.id, isActive: user.isActive });
+
+    await prisma.$transaction(async (tx) => {
+      const formerMemberId = await getOrCreateFormerMemberUserId(tx);
+      await tx.timeEntry.updateMany({
+        where: { userId: req.params.id },
+        data: { userId: formerMemberId },
+      });
+      await tx.user.delete({ where: { id: req.params.id } });
+    });
+
+    res.status(204).end();
   })
 );
 
