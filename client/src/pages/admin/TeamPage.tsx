@@ -7,6 +7,7 @@ import clsx from "../../lib/clsx";
 import DevLinkNotice from "../../components/DevLinkNotice";
 import ConfirmActionDialog from "../../components/ConfirmActionDialog";
 import ConfirmDeleteDialog from "../../components/ConfirmDeleteDialog";
+import KebabMenu, { type KebabMenuItem } from "../../components/KebabMenu";
 
 interface CreateForm {
   name: string;
@@ -191,6 +192,8 @@ export default function TeamPage() {
     return { label: "Active", className: "bg-brand-50 text-brand-700" };
   }
 
+  const activeAdminCount = team.filter((m) => m.role === "ADMIN" && m.isActive).length;
+
   return (
     <div className="mx-auto max-w-3xl overflow-y-auto p-8">
       <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight text-ink">Team</h1>
@@ -253,6 +256,29 @@ export default function TeamPage() {
             {team.map((member) => {
               const status = statusBadge(member);
               const resendLink = resendLinks[member.id];
+              // The last remaining active admin can't be deactivated, demoted,
+              // or deleted (the server rejects all three the same way), so
+              // those items are left off their menu entirely rather than
+              // shown as options that will just fail.
+              const isLastActiveAdmin = member.role === "ADMIN" && member.isActive && activeAdminCount <= 1;
+
+              const menuItems: KebabMenuItem[] = [{ label: "Edit", onClick: () => openEdit(member) }];
+              if (!member.activatedAt && member.isActive) {
+                menuItems.push({ label: "Resend invite", onClick: () => resendInvite(member) });
+              }
+              if (!(member.isActive && isLastActiveAdmin)) {
+                menuItems.push({ label: member.isActive ? "Deactivate" : "Activate", onClick: () => toggleActive(member) });
+              }
+              if (member.role !== "ADMIN" || !isLastActiveAdmin) {
+                menuItems.push({
+                  label: member.role === "ADMIN" ? "Remove Admin" : "Make Admin",
+                  onClick: () => setAdminAction({ member, makeAdmin: member.role !== "ADMIN" }),
+                });
+              }
+              if (!(member.isActive && isLastActiveAdmin)) {
+                menuItems.push({ label: "Delete", tone: "danger", dividerBefore: true, onClick: () => setDeleteTarget(member) });
+              }
+
               return (
                 <tr key={member.id} className="transition-colors duration-150 hover:bg-line-soft/30">
                   <td className="px-4 py-3 align-top">
@@ -284,33 +310,8 @@ export default function TeamPage() {
                   <td className="px-4 py-3 align-top">
                     <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", status.className)}>{status.label}</span>
                   </td>
-                  <td className="px-4 py-3 align-top">
-                    <div className="flex flex-col items-end">
-                      <div className="flex w-full flex-col items-end gap-1.5">
-                        <button onClick={() => openEdit(member)} className="font-medium text-brand-600 hover:underline">
-                          Edit
-                        </button>
-                        {!member.activatedAt && member.isActive && (
-                          <button onClick={() => resendInvite(member)} className="text-brand-600 hover:underline">
-                            Resend invite
-                          </button>
-                        )}
-                        <button onClick={() => toggleActive(member)} className="text-ink-faint hover:underline">
-                          {member.isActive ? "Deactivate" : "Activate"}
-                        </button>
-                        <button
-                          onClick={() => setAdminAction({ member, makeAdmin: member.role !== "ADMIN" })}
-                          className="text-accent-600 hover:underline"
-                        >
-                          {member.role === "ADMIN" ? "Remove Admin" : "Make Admin"}
-                        </button>
-                      </div>
-                      <div className="mt-2 w-full border-t border-line pt-1.5 text-right">
-                        <button onClick={() => setDeleteTarget(member)} className="font-medium text-danger-600 hover:underline">
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                  <td className="px-4 py-3 text-right align-top">
+                    <KebabMenu items={menuItems} />
                     {resendLink && (
                       <div className="mt-2 text-left">
                         <DevLinkNotice label="New invite link:" link={resendLink} />
