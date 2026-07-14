@@ -284,27 +284,33 @@ export default function TeamPage() {
                   <td className="px-4 py-3 align-top">
                     <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", status.className)}>{status.label}</span>
                   </td>
-                  <td className="px-4 py-3 text-right align-top">
-                    <button onClick={() => openEdit(member)} className="mr-3 font-medium text-brand-600 hover:underline">
-                      Edit
-                    </button>
-                    {!member.activatedAt && member.isActive && (
-                      <button onClick={() => resendInvite(member)} className="mr-3 text-brand-600 hover:underline">
-                        Resend invite
-                      </button>
-                    )}
-                    <button onClick={() => toggleActive(member)} className="mr-3 text-ink-faint hover:underline">
-                      {member.isActive ? "Deactivate" : "Activate"}
-                    </button>
-                    <button
-                      onClick={() => setAdminAction({ member, makeAdmin: member.role !== "ADMIN" })}
-                      className="mr-3 text-accent-600 hover:underline"
-                    >
-                      {member.role === "ADMIN" ? "Remove Admin" : "Make Admin"}
-                    </button>
-                    <button onClick={() => setDeleteTarget(member)} className="font-medium text-danger-600 hover:underline">
-                      Delete
-                    </button>
+                  <td className="px-4 py-3 align-top">
+                    <div className="flex flex-col items-end">
+                      <div className="flex w-full flex-col items-end gap-1.5">
+                        <button onClick={() => openEdit(member)} className="font-medium text-brand-600 hover:underline">
+                          Edit
+                        </button>
+                        {!member.activatedAt && member.isActive && (
+                          <button onClick={() => resendInvite(member)} className="text-brand-600 hover:underline">
+                            Resend invite
+                          </button>
+                        )}
+                        <button onClick={() => toggleActive(member)} className="text-ink-faint hover:underline">
+                          {member.isActive ? "Deactivate" : "Activate"}
+                        </button>
+                        <button
+                          onClick={() => setAdminAction({ member, makeAdmin: member.role !== "ADMIN" })}
+                          className="text-accent-600 hover:underline"
+                        >
+                          {member.role === "ADMIN" ? "Remove Admin" : "Make Admin"}
+                        </button>
+                      </div>
+                      <div className="mt-2 w-full border-t border-line pt-1.5 text-right">
+                        <button onClick={() => setDeleteTarget(member)} className="font-medium text-danger-600 hover:underline">
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                     {resendLink && (
                       <div className="mt-2 text-left">
                         <DevLinkNotice label="New invite link:" link={resendLink} />
